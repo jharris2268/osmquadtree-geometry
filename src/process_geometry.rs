@@ -55,7 +55,7 @@ impl StoreBlocks {
         }
     }
     fn add_point(&mut self, p: PointGeometry) {
-        for i in p.quadtree.depth()..0 {
+        for i in (0..p.quadtree.depth()).rev() {
             match self.tiles.get_mut(&p.quadtree.round(i)) {
                 Some(b) => { b.points.push(p); return; }
                 _ => {}
@@ -66,7 +66,7 @@ impl StoreBlocks {
     }
 
     fn add_linestring(&mut self, p: LinestringGeometry) {
-        for i in p.quadtree.depth()..0 {
+        for i in (0..p.quadtree.depth()).rev() {
             match self.tiles.get_mut(&p.quadtree.round(i)) {
                 Some(b) => { b.linestrings.push(p); return; }
                 _ => {}
@@ -76,7 +76,7 @@ impl StoreBlocks {
         //return self.tiles.get_mut(&Quadtree::new(0)).unwrap()
     }
     fn add_simple_polygon(&mut self, p: SimplePolygonGeometry) {
-        for i in p.quadtree.depth()..0 {
+        for i in (0..p.quadtree.depth()).rev() {
             match self.tiles.get_mut(&p.quadtree.round(i)) {
                 Some(b) => { b.simple_polygons.push(p); return; }
                 _ => {}
@@ -86,7 +86,7 @@ impl StoreBlocks {
         //return self.tiles.get_mut(&Quadtree::new(0)).unwrap()
     }
     fn add_complicated_polygon(&mut self, p: ComplicatedPolygonGeometry) {
-        for i in p.quadtree.depth()..0 {
+        for i in (0..p.quadtree.depth()).rev() {
             match self.tiles.get_mut(&p.quadtree.round(i)) {
                 Some(b) => { b.complicated_polygons.push(p); return; }
                 _ => {}
