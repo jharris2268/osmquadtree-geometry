@@ -31,7 +31,7 @@ impl WithQuadtree for GeometryElement {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct GeometryBlock {
     pub index: i64,
     pub quadtree: Quadtree,
