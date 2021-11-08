@@ -46,11 +46,11 @@ fn get_i64(x: Option<&str>) -> Option<i64> {
 }
 
 const NUMCHAN_DEFAULT: usize = 4;
-const RAM_GB_DEFAULT: usize= 8;
+/*const RAM_GB_DEFAULT: usize= 8;
 const QT_MAX_LEVEL_DEFAULT: usize = 18;
 const QT_GRAPH_LEVEL_DEFAULT: usize = 17;
 const QT_BUFFER_DEFAULT: f64 = 0.05;
-
+*/
 
 
 fn main() {
