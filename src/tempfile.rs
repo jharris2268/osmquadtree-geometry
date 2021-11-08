@@ -36,7 +36,7 @@ impl CallFinish for WrapWriteFile {
     }
 }
 
-pub(crate) fn prep_write_geometry_pbffile(ofn: &str, bbox: &Bbox, numchan: usize) -> Result<CallFinishGeometryBlock> {
+pub fn prep_write_geometry_pbffile(ofn: &str, bbox: &Bbox, numchan: usize) -> Result<CallFinishGeometryBlock> {
     
     let wf = Box::new(WrapWriteFile(WriteFile::with_bbox(
             &ofn,
@@ -185,7 +185,7 @@ where
     }
 }
 
-pub(crate) fn make_write_temp_geometry(outfn: &str, filelocs: &ParallelFileLocs, max_minzoom: &Option<i64>, numchan: usize) -> 
+pub fn make_write_temp_geometry(outfn: &str, filelocs: &ParallelFileLocs, max_minzoom: &Option<i64>, numchan: usize) -> 
     Result<(CallFinishGeometryBlock, Arc<QuadtreeTree>)> {
     
     let groups = prep_groups_from_filelocs(&filelocs, &max_minzoom)?;
@@ -290,7 +290,7 @@ impl<T> CallFinish for SortBlocksTempGeometry<T>
         
 
 
-pub(crate) fn write_temp_geometry(outfn: &str, bbox: &Bbox, tempdata: TempData, groups: Arc<QuadtreeTree>, numchan: usize) -> Result<()> {
+pub fn write_temp_geometry(outfn: &str, bbox: &Bbox, tempdata: TempData, groups: Arc<QuadtreeTree>, numchan: usize) -> Result<()> {
     let wf = Box::new(WrapWriteFile(WriteFile::with_bbox(
             &outfn,
             HeaderType::ExternalLocs,

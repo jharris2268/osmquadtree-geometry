@@ -9,10 +9,11 @@ use crate::position::{calc_line_length, calc_ring_area};
 use crate::relationtags::AddRelationTags;
 use crate::{
     CollectWayNodes, GeometryBlock, GeometryStyle, LinestringGeometry, OtherData, PointGeometry,
-    SimplePolygonGeometry, ComplicatedPolygonGeometry, Timings, WorkingBlock,
+    SimplePolygonGeometry, ComplicatedPolygonGeometry, Timings, WorkingBlock,CallFinishGeometryBlock,
+    prep_write_geometry_pbffile, make_write_temp_geometry, write_temp_geometry
 };
 
-use crate::tempfile::{prep_write_geometry_pbffile, make_write_temp_geometry, write_temp_geometry};
+
 
 use channelled_callbacks::{CallFinish, Callback, CallbackMerge, CallbackSync, MergeTimings, ReplaceNoneWithTimings};
 use osmquadtree::utils::{
@@ -27,7 +28,7 @@ use osmquadtree::pbfformat::{
     read_all_blocks_parallel_with_progbar, FileBlock,
 };
 use osmquadtree::sortblocks::{TempData,QuadtreeTree};
-
+use osmquadtree::update::ParallelFileLocs;
 
 use osmquadtree::update::get_file_locs;
 use serde_json::{json, Map, Value};
@@ -36,7 +37,7 @@ use std::io::{Error,ErrorKind,Result};
 use std::sync::Arc;
 
 
-struct StoreBlocks {
+pub struct StoreBlocks {
     tiles: BTreeMap<Quadtree, GeometryBlock>,
     rem: Option<GeometryBlock>,
     nt: usize,
@@ -393,75 +394,17 @@ pub enum OutputType {
     Postgresql(PostgresqlOptions),
 }
 
-pub fn process_geometry(
-    prfx: &str,
-    outfn: OutputType,
-    filter: Option<&str>,
-    timestamp: Option<&str>,
-    find_minzoom: bool,
-    style_name: Option<&str>,
-    max_minzoom: Option<i64>,
+
+pub fn process_geometry_call(
+    pfilelocs: &mut ParallelFileLocs,
+    out: Option<CallFinishGeometryBlock>,
+    style: Arc<GeometryStyle>,
+    minzoom: Option<MinZoomSpec>,
     numchan: usize,
-) -> Result<Option<Vec<GeometryBlock>>> {
-    let mut tx = LogTimes::new();
-    let (bbox, poly) = read_filter(filter)?;
 
-    message!("bbox={}, poly={:?}", bbox, poly);
-
-    tx.add("read filter");
-    let timestamp = match timestamp {
-        None => None,
-        Some(ts) => Some(parse_timestamp(ts)?),
-    };
-
-    let mut pfilelocs = get_file_locs(prfx, Some(bbox.clone()), timestamp)?;
-    tx.add("get_file_locs");
-
-    let style = match style_name {
-        None => Arc::new(GeometryStyle::default()),
-        Some(fname) => Arc::new(GeometryStyle::from_file(&fname)?),
-    };
-    tx.add("load_style");
-
-    if !find_minzoom && !max_minzoom.is_none() {
-        return Err(Error::new(ErrorKind::Other, "must run with find_minzoom=true if specifing max_minzoom"));
-    }
-
-    let minzoom: Option<MinZoomSpec> = if find_minzoom {
-        message!("MinZoomSpec::default({}, {:?})", 5.0, max_minzoom);
-        Some(MinZoomSpec::default(5.0, max_minzoom))
-    } else {
-        
-        None
-    };
-    tx.add("load_minzoom");
-    
-    let mut groups: Option<Arc<QuadtreeTree>> = None;
+) -> Timings {
     
     
-    let out: Option<Box<dyn CallFinish<CallType = GeometryBlock, ReturnType = Timings>>> =
-        match &outfn {
-            OutputType::None => None,
-            OutputType::Collect | OutputType::Json(_) | OutputType::TiledJson(_) => {
-                let mut qq = Vec::new();
-                for a in &pfilelocs.1 {
-                    qq.push(a.0.clone());
-                }
-                Some(Box::new(StoreBlocks::new(qq)))
-            },
-            OutputType::PbfFile(ofn) => {
-                Some(prep_write_geometry_pbffile(ofn, &bbox, numchan)?)
-            },
-            OutputType::PbfFileSorted(ofn) => {
-                let (pp,gg) = make_write_temp_geometry(ofn, &pfilelocs, &max_minzoom, numchan)?;
-                groups = Some(gg);
-                Some(pp)
-            },
-                
-            OutputType::Postgresql(options) => {
-                Some(make_write_postgresql_geometry(&options, numchan)?)
-            }
-        };
 
     let cf = Box::new(CollectWorkingTiles::new(out));
 
@@ -470,7 +413,7 @@ pub fn process_geometry(
 
     let pp: Box<dyn CallFinish<CallType = (usize, Vec<FileBlock>), ReturnType = Timings>> =
         if numchan == 0 {
-            let fm: CallFinishWorkingBlock = if find_minzoom {
+            let fm: CallFinishWorkingBlock = if !minzoom.is_none() {
                 Box::new(FindMinZoom::new(cf, minzoom))
             } else {
                 cf
@@ -500,7 +443,7 @@ pub fn process_geometry(
             make_read_primitive_blocks_combine_call_all(ww)
         } else {
             let cfb = Box::new(Callback::new(cf));
-            let fm: CallFinishWorkingBlock = if find_minzoom {
+            let fm: CallFinishWorkingBlock = if !minzoom.is_none() {
                 Box::new(Callback::new(Box::new(FindMinZoom::new(cfb, minzoom))))
             } else {
                 cfb
@@ -550,13 +493,89 @@ pub fn process_geometry(
         };
 
     let msg = format!("process_geometry, numchan={}", numchan);
-    let tm = read_all_blocks_parallel_with_progbar(
+    
+    read_all_blocks_parallel_with_progbar(
         &mut pfilelocs.0,
         &pfilelocs.1,
         pp,
         &msg,
         pfilelocs.2,
-    );
+    )
+}
+
+
+pub fn process_geometry(
+    prfx: &str,
+    outfn: OutputType,
+    filter: Option<&str>,
+    timestamp: Option<&str>,
+    find_minzoom: bool,
+    style_name: Option<&str>,
+    max_minzoom: Option<i64>,
+    numchan: usize,
+) -> Result<Option<Vec<GeometryBlock>>> {
+    let mut tx = LogTimes::new();
+    let (bbox, poly) = read_filter(filter)?;
+
+    message!("bbox={}, poly={:?}", bbox, poly);
+
+    tx.add("read filter");
+    let timestamp = match timestamp {
+        None => None,
+        Some(ts) => Some(parse_timestamp(ts)?),
+    };
+
+    let mut pfilelocs = get_file_locs(prfx, Some(bbox.clone()), timestamp)?;
+    tx.add("get_file_locs");
+
+    let style = match style_name {
+        None => Arc::new(GeometryStyle::default()),
+        Some(fname) => Arc::new(GeometryStyle::from_file(&fname)?),
+    };
+    tx.add("load_style");
+
+    if !find_minzoom && !max_minzoom.is_none() {
+        return Err(Error::new(ErrorKind::Other, "must run with find_minzoom=true if specifing max_minzoom"));
+    }
+
+    let minzoom: Option<MinZoomSpec> = if find_minzoom {
+        message!("MinZoomSpec::default({}, {:?})", 5.0, max_minzoom);
+        Some(MinZoomSpec::default(5.0, max_minzoom))
+    } else {
+        
+        None
+    };
+    tx.add("load_minzoom");
+    
+    
+    let mut groups: Option<Arc<QuadtreeTree>> = None;
+    
+    
+    let out: Option<Box<dyn CallFinish<CallType = GeometryBlock, ReturnType = Timings>>> =
+        match &outfn {
+            OutputType::None => None,
+            OutputType::Collect | OutputType::Json(_) | OutputType::TiledJson(_) => {
+                let mut qq = Vec::new();
+                for a in &pfilelocs.1 {
+                    qq.push(a.0.clone());
+                }
+                Some(Box::new(StoreBlocks::new(qq)))
+            },
+            OutputType::PbfFile(ofn) => {
+                Some(prep_write_geometry_pbffile(ofn, &bbox, numchan)?)
+            },
+            OutputType::PbfFileSorted(ofn) => {
+                let (pp,gg) = make_write_temp_geometry(ofn, &pfilelocs, &max_minzoom, numchan)?;
+                groups = Some(gg);
+                Some(pp)
+            },
+                
+            OutputType::Postgresql(options) => {
+                Some(make_write_postgresql_geometry(&options, numchan)?)
+            }
+        };
+    
+    let tm = process_geometry_call(&mut pfilelocs, out, style, minzoom, numchan);    
 
     tx.add("process_geometry");
 

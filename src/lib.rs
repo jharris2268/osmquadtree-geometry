@@ -27,6 +27,7 @@ pub use crate::elements::{
 pub use crate::geometry_block::{GeometryElement,GeometryBlock};
 pub use crate::process_geometry::{process_geometry, OutputType};
 pub use crate::style::GeometryStyle;
+pub use crate::tempfile::{prep_write_geometry_pbffile, make_write_temp_geometry, write_temp_geometry};
 
 use std::collections::BTreeMap;
 
