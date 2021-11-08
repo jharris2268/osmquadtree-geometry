@@ -37,7 +37,7 @@ use std::sync::Arc;
 
 
 struct StoreBlocks {
-    tiles: BTreeMap<i64, GeometryBlock>,
+    tiles: BTreeMap<Quadtree, GeometryBlock>,
     rem: Option<GeometryBlock>,
     nt: usize,
 }
@@ -46,7 +46,7 @@ impl StoreBlocks {
     pub fn new(qq: Vec<Quadtree>) -> StoreBlocks {
         let mut tiles = BTreeMap::new();
         for q in qq {
-            tiles.insert(q.as_int(), GeometryBlock::new(tiles.len() as i64, q.clone(), 0));
+            tiles.insert(q, GeometryBlock::new(tiles.len() as i64, q.clone(), 0));
         }
         StoreBlocks {
             tiles: tiles, 
@@ -56,7 +56,7 @@ impl StoreBlocks {
     }
     fn add_point(&mut self, p: PointGeometry) {
         for i in p.quadtree.depth()..0 {
-            match self.tiles.get_mut(&p.quadtree.round(i).as_int()) {
+            match self.tiles.get_mut(&p.quadtree.round(i)) {
                 Some(b) => { b.points.push(p); return; }
                 _ => {}
             }
@@ -67,7 +67,7 @@ impl StoreBlocks {
 
     fn add_linestring(&mut self, p: LinestringGeometry) {
         for i in p.quadtree.depth()..0 {
-            match self.tiles.get_mut(&p.quadtree.round(i).as_int()) {
+            match self.tiles.get_mut(&p.quadtree.round(i)) {
                 Some(b) => { b.linestrings.push(p); return; }
                 _ => {}
             }
@@ -77,7 +77,7 @@ impl StoreBlocks {
     }
     fn add_simple_polygon(&mut self, p: SimplePolygonGeometry) {
         for i in p.quadtree.depth()..0 {
-            match self.tiles.get_mut(&p.quadtree.round(i).as_int()) {
+            match self.tiles.get_mut(&p.quadtree.round(i)) {
                 Some(b) => { b.simple_polygons.push(p); return; }
                 _ => {}
             }
@@ -87,7 +87,7 @@ impl StoreBlocks {
     }
     fn add_complicated_polygon(&mut self, p: ComplicatedPolygonGeometry) {
         for i in p.quadtree.depth()..0 {
-            match self.tiles.get_mut(&p.quadtree.round(i).as_int()) {
+            match self.tiles.get_mut(&p.quadtree.round(i)) {
                 Some(b) => { b.complicated_polygons.push(p); return; }
                 _ => {}
             }
@@ -129,7 +129,7 @@ impl CallFinish for StoreBlocks {
         let mut tms = Timings::new();
         let rem = std::mem::take(&mut self.rem).unwrap();
         if rem.len()>0 {
-            self.tiles.insert(-2, rem);
+            self.tiles.insert(Quadtree::empty(), rem);
         }
         for (_, t) in self.tiles.iter_mut() {
             t.sort();
@@ -336,7 +336,7 @@ where
     }
 }
 
-fn write_geojson_tiles(tiles: &BTreeMap<i64, GeometryBlock>, outfn: &str) -> Result<()> {
+fn write_geojson_tiles(tiles: &BTreeMap<Quadtree, GeometryBlock>, outfn: &str) -> Result<()> {
     let mut v = Vec::new();
     for (_, t) in tiles {
         v.push(t.to_geojson(false)?);
@@ -356,7 +356,7 @@ fn pack_feature_collection<F: GeoJsonable>(feats: &[F]) -> Result<Value> {
     Ok(json!(m))
 }
 
-fn write_geojson_flat(tiles: BTreeMap<i64, GeometryBlock>, outfn: &str) -> Result<()> {
+fn write_geojson_flat(tiles: BTreeMap<Quadtree, GeometryBlock>, outfn: &str) -> Result<()> {
     let mut tt = GeometryBlock::new(0, Quadtree::empty(), 0);
     for (_, t) in tiles {
         tt.extend(t);
