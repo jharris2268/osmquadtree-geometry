@@ -51,7 +51,7 @@ impl WorkingBlock {
 pub enum OtherData {
     Errors(Vec<(Element, String)>),
     Messages(Vec<String>),
-    GeometryBlocks(BTreeMap<Quadtree, GeometryBlock>),
+    GeometryBlocks(BTreeMap<i64, GeometryBlock>),
     TempData(TempData),
 }
 
