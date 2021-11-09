@@ -29,7 +29,7 @@ pub use crate::process_geometry::{process_geometry, OutputType, StoreBlocks,proc
 pub use crate::style::GeometryStyle;
 pub use crate::tempfile::{prep_write_geometry_pbffile, make_write_temp_geometry, write_temp_geometry};
 pub use crate::minzoom::{FindMinZoom, MinZoomSpec};
-
+pub use crate::default_minzoom_values::DEFAULT_MINZOOM_VALUES;
 
 use std::collections::BTreeMap;
 
