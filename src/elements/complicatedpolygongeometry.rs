@@ -555,7 +555,7 @@ impl GeoJsonable for ComplicatedPolygonGeometry {
                 res.insert(String::from("minzoom"), json!(l));
             }
         }
-        res.insert(String::from("bbox"), pack_bounds(&self.bounds()));
+        res.insert(String::from("bbox"), pack_bounds(&self.bounds(),transform));
 
         Ok(json!(res))
     }

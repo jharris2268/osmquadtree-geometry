@@ -25,17 +25,20 @@ pub fn read_lonlats<T: Borrow<LonLat>>(lonlats: &Vec<T>, is_reversed: bool, tran
     }
     res
 }
-pub fn pack_bounds(bounds: &Bbox) -> Value {
-    //let a = LonLat::new(bounds.minlon, bounds.minlat).forward();
-    //let b = LonLat::new(bounds.maxlon, bounds.maxlat).forward();
-    //json!((a.x,a.y,b.x,b.y))
-
-    json!((
-        coordinate_as_float(bounds.minlon),
-        coordinate_as_float(bounds.minlat),
-        coordinate_as_float(bounds.maxlon),
-        coordinate_as_float(bounds.maxlat)
-    ))
+pub fn pack_bounds(bounds: &Bbox, transform: bool) -> Value {
+    
+    if transform {
+        let a = LonLat::new(bounds.minlon, bounds.minlat).forward();
+        let b = LonLat::new(bounds.maxlon, bounds.maxlat).forward();
+        json!((a.x,a.y,b.x,b.y))
+    } else {
+        json!((
+            coordinate_as_float(bounds.minlon),
+            coordinate_as_float(bounds.minlat),
+            coordinate_as_float(bounds.maxlon),
+            coordinate_as_float(bounds.maxlat)
+        ))
+    }
 }
 
 #[derive(Debug, Serialize,Clone)]
@@ -155,7 +158,7 @@ impl GeoJsonable for SimplePolygonGeometry {
                 res.insert(String::from("minzoom"), json!(l));
             }
         }
-        res.insert(String::from("bbox"), pack_bounds(&self.bounds()));
+        res.insert(String::from("bbox"), pack_bounds(&self.bounds(),transform));
 
         Ok(json!(res))
     }

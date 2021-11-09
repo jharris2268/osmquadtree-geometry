@@ -102,9 +102,19 @@ impl GeoJsonable for PointGeometry {
                 res.insert(String::from("minzoom"), json!(l));
             }
         }
-
-        let p = self.lonlat.forward();
-        res.insert(String::from("bbox"), json!(vec![p.x, p.y, p.x, p.y]));
+        
+        if transform {
+            
+            let p = self.lonlat.forward();
+            res.insert(String::from("bbox"), json!(vec![p.x, p.y, p.x, p.y]));
+        } else {
+            res.insert(String::from("bbox"), json!(vec![
+                coordinate_as_float(self.lonlat.lon),
+                coordinate_as_float(self.lonlat.lat),
+                coordinate_as_float(self.lonlat.lon),
+                coordinate_as_float(self.lonlat.lat),
+                ]));
+        }
 
         Ok(json!(res))
     }
