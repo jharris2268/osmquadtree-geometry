@@ -189,6 +189,14 @@ pub struct GeometryStyle {
 }
 
 impl GeometryStyle {
+    
+    pub fn from_json(input_str: &str) -> Result<GeometryStyle> {
+        match serde_json::from_str(input_str) {
+            Ok(g) => Ok(g),
+            Err(e) => Err(Error::new(ErrorKind::Other, e.to_string()))
+        }
+    }
+    
     pub fn default() -> GeometryStyle {
         serde_json::from_str(&DEFAULT_GEOMETRY_STYLE).expect("!!")
     }
