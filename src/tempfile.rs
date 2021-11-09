@@ -1,8 +1,8 @@
 use osmquadtree::sortblocks::{QuadtreeTree, WriteTempData, WriteTempFile, WriteTempFileSplit, TempData,SortBlocks,CollectTemp,read_temp_data};
 use channelled_callbacks::{CallFinish, Callback, CallbackMerge, CallbackSync, CallAll, MergeTimings, ReplaceNoneWithTimings};
 use osmquadtree::utils::ThreadTimer;
-use osmquadtree::pbfformat::{HeaderType, FileBlock, WriteFile, pack_file_block,};
-use osmquadtree::update::ParallelFileLocs;
+use osmquadtree::pbfformat::{HeaderType, FileBlock, WriteFile, pack_file_block,ParallelFileLocs};
+
 use crate::{GeometryBlock,CallFinishGeometryBlock,Timings,OtherData};
 use osmquadtree::elements::{Bbox,};
 use osmquadtree::message;

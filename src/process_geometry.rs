@@ -26,11 +26,12 @@ use osmquadtree::mergechanges::read_filter;
 use osmquadtree::pbfformat::{
     make_read_primitive_blocks_combine_call_all,
     read_all_blocks_parallel_with_progbar, FileBlock,
+    ParallelFileLocs, get_file_locs
 };
 use osmquadtree::sortblocks::{TempData,QuadtreeTree};
-use osmquadtree::update::ParallelFileLocs;
 
-use osmquadtree::update::get_file_locs;
+
+
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
 use std::io::{Error,ErrorKind,Result};
