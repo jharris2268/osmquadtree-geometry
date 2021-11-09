@@ -118,7 +118,7 @@ impl Ring {
         f == t
     }
 
-    pub fn refs<'a>(&'a self) -> Result<Vec<&'a i64>> {
+    /*pub fn refs<'a>(&'a self) -> Result<Vec<&'a i64>> {
         let mut res = Vec::new();
         for p in &self.parts {
             if p.is_reversed {
@@ -149,7 +149,39 @@ impl Ring {
 
         Ok(res)
     }
-    pub fn lonlats<'a>(&'a self) -> Result<Vec<&'a LonLat>> {
+    */
+    pub fn refs(&self) -> Result<Vec<i64>> {
+        let mut res = Vec::new();
+        for p in &self.parts {
+            if p.is_reversed {
+                let mut ii = p.refs.iter().rev();
+
+                if !res.is_empty() {
+                    let f = ii.next().unwrap();
+                    if res[res.len() - 1] != *f {
+                        return Err(Error::new(ErrorKind::Other, "not a ring"));
+                    }
+                }
+                res.extend(ii);
+            } else {
+                let mut ii = p.refs.iter();
+
+                if !res.is_empty() {
+                    let f = ii.next().unwrap();
+                    if res[res.len() - 1] != *f {
+                        return Err(Error::new(ErrorKind::Other, "not a ring"));
+                    }
+                }
+                res.extend(ii);
+            }
+        }
+        if res[0] != res[res.len() - 1] {
+            return Err(Error::new(ErrorKind::Other, "not a ring"));
+        }
+
+        Ok(res)
+    }
+    pub fn lonlats(&self) -> Result<Vec<LonLat>> {
         let mut res = Vec::new();
         for p in &self.parts {
             if p.is_reversed {
@@ -157,21 +189,21 @@ impl Ring {
 
                 if !res.is_empty() {
                     let f = ii.next().unwrap();
-                    if res[res.len() - 1] != f {
+                    if &res[res.len() - 1] != f {
                         return Err(Error::new(ErrorKind::Other, "not a ring"));
                     }
                 }
-                res.extend(ii);
+                res.extend(ii.map(|l| l.clone()));
             } else {
                 let mut ii = p.lonlats.iter();
 
                 if !res.is_empty() {
                     let f = ii.next().unwrap();
-                    if res[res.len() - 1] != f {
+                    if &res[res.len() - 1] != f {
                         return Err(Error::new(ErrorKind::Other, "not a ring"));
                     }
                 }
-                res.extend(ii);
+                res.extend(ii.map(|l| l.clone()));
             }
         }
         if res[0] != res[res.len() - 1] {
