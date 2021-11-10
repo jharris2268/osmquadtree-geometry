@@ -194,6 +194,55 @@ pub const DEFAULT_GEOMETRY_STYLE: &str = r#"
             "target_key": "bicycle_routes",
             "type": "list"
         }
-    ]
+    ],
+    "z_order_spec": {
+        "highway": {
+            "motorway": 380,
+            "trunk": 370,
+            "primary": 360,
+            "secondary": 350,
+            "tertiary": 340,
+            "residential": 330,
+            "unclassified": 330,
+            "road": 330,
+            "living_street": 320,
+            "pedestrian": 310,
+            "raceway": 300,
+            "motorway_link": 240,
+            "trunk_link": 230,
+            "primary_link": 220,
+            "secondary_link": 210,
+            "tertiary_link": 200,
+            "service": 150,
+            "track": 110,
+            "path": 100,
+            "footway": 100,
+            "bridleway": 100,
+            "cycleway": 100,
+            "steps": 90,
+            "platform": 90,
+            "construction": 10
+        },
+        "railway": {
+            "rail": 440,
+            "subway": 420,
+            "narrow_gauge": 420,
+            "light_rail": 420,
+            "funicular": 420,
+            "preserved": 420,
+            "monorail": 420,
+            "miniature": 420,
+            "turntable": 420,
+            "tram": 410,
+            "disused": 400,
+            "construction": 400,
+            "platform": 90
+        },
+        "aeroway": {
+            "runway": 60,
+            "taxiway": 50
+        }
+    }
+
 }
 "#;

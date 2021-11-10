@@ -39,7 +39,7 @@ pub struct RelationTagSpec {
     #[serde(rename(serialize = "type", deserialize = "type"))]
     pub op_type: OpType,
 }
-
+/*
 fn get_zorder_value(t: &Tag) -> Option<i64> {
     if t.key == "highway" {
         if t.val == "motorway" {
@@ -173,7 +173,7 @@ fn get_zorder_value(t: &Tag) -> Option<i64> {
         return None;
     }
     return None;
-}
+}*/
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GeometryStyle {
@@ -182,6 +182,7 @@ pub struct GeometryStyle {
     pub polygon_tags: BTreeMap<String, PolyTagSpec>,
     pub parent_tags: BTreeMap<String, ParentTagSpec>,
     pub relation_tag_spec: Vec<RelationTagSpec>,
+    pub z_order_spec: BTreeMap<String,BTreeMap<String,i64>>,
     pub all_objs: bool,
     pub drop_keys: BTreeSet<String>,
     pub multipolygons: bool,
@@ -246,7 +247,17 @@ impl GeometryStyle {
             Some(x) => self.drop_keys.contains(&k[0..x + 1]),
         }
     }
-
+    fn get_zorder_value(&self, t: &Tag) -> Option<i64> {
+        if let Some(p) = self.z_order_spec.get(&t.key) {
+            if let Some(q) = p.get(&t.val) {
+                return Some(*q);
+            } else if let Some(q) = p.get("*") {
+                return Some(*q);
+            }
+        }
+        None
+    }
+    
     fn filter_tags(&self, tags: &[Tag]) -> (Vec<Tag>, Option<i64>, Option<i64>) {
         let mut res = Vec::new();
         let mut z_order: Option<i64> = None;
@@ -266,7 +277,7 @@ impl GeometryStyle {
                     Err(_) => {}
                 }
             }
-            match get_zorder_value(&t) {
+            match self.get_zorder_value(&t) {
                 None => {}
                 Some(nv) => {
                     z_order = match z_order {
