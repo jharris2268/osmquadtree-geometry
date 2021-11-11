@@ -585,16 +585,9 @@ pub fn unpack_geometry_block_filter(idx: i64, data: &[u8], filter: &GeometryFilt
 
 use channelled_callbacks::{/*CallFinish,Timings,CallbackSync,CallbackMerge,*/CallAll};
 use osmquadtree::message;
-use osmquadtree::pbfformat::{get_file_locs,read_all_blocks_parallel_with_progbar,FileBlock};
+use osmquadtree::pbfformat::{get_file_locs_max_depth,read_all_blocks_parallel_with_progbar,FileBlock};
 use std::sync::Arc;
 
-fn sum_len(locs: &Vec<(usize,u64)>) -> u64 {
-    let mut r=0;
-    for (a,_) in locs {
-        r+=*a as u64;
-    }
-    r
-}
 
 pub fn read_geometry_blocks(
     infn: &str, cb: CallFinishGeometryBlock, filter_str: Option<&str>, max_minzoom: Option<i64>, numchan: usize) -> Result<Timings> {
@@ -610,21 +603,14 @@ pub fn read_geometry_blocks(
             GeometryFilter::Bbox(bx.clone())
         }
     });
+    let max_depth = match max_minzoom {
+        None=>None,
+        Some(md) => Some(md as usize)
+    };
+    
+    let (mut files, locs, total_len)  = get_file_locs_max_depth(infn, Some(bx), None, max_depth)?;
     
     
-    let (mut files, locs, total_len)  = get_file_locs(infn, Some(bx), None)?;
-    
-    let (locs, total_len) = if let Some(mm) = &max_minzoom {
-        let mut nl = Vec::new();
-        let mut ntl=0;
-        for p in locs {
-            if p.0.depth() <= (*mm as usize) {
-                ntl+=sum_len(&p.1);
-                nl.push(p);
-            }
-        }
-        (nl,ntl)
-    } else { (locs,total_len) };
     
     let r = if numchan == 0 {
         let cc = Box::new(CallAll::new(
