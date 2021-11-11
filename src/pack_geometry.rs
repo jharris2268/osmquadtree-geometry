@@ -588,6 +588,14 @@ use osmquadtree::message;
 use osmquadtree::pbfformat::{get_file_locs,read_all_blocks_parallel_with_progbar,FileBlock};
 use std::sync::Arc;
 
+fn sum_len(locs: &Vec<(usize,u64)>) -> u64 {
+    let mut r=0;
+    for (a,_) in locs {
+        r+=*a as u64;
+    }
+    r
+}
+
 pub fn read_geometry_blocks(
     infn: &str, cb: CallFinishGeometryBlock, filter_str: Option<&str>, max_minzoom: Option<i64>, numchan: usize) -> Result<Timings> {
     
@@ -604,7 +612,19 @@ pub fn read_geometry_blocks(
     });
     
     
-    let mut pfilelocs = get_file_locs(infn, Some(bx), None)?;
+    let (mut files, locs, total_len)  = get_file_locs(infn, Some(bx), None)?;
+    
+    let (locs, total_len) = if let Some(mm) = &max_minzoom {
+        let mut nl = Vec::new();
+        let mut ntl=0;
+        for p in locs {
+            if p.0.depth() <= (*mm as usize) {
+                ntl+=sum_len(&p.1);
+                nl.push(p);
+            }
+        }
+        (nl,ntl)
+    } else { (locs,total_len) };
     
     let r = if numchan == 0 {
         let cc = Box::new(CallAll::new(
@@ -614,7 +634,7 @@ pub fn read_geometry_blocks(
             })
         ));
         
-        Ok(read_all_blocks_parallel_with_progbar(&mut pfilelocs.0, &pfilelocs.1, cc, "read geometry blocks", pfilelocs.2))
+        Ok(read_all_blocks_parallel_with_progbar(&mut files, &locs, cc, "read geometry blocks", total_len))
     } else {
         Err(Error::new(ErrorKind::Other, "not impl"))
     }?;
