@@ -1,9 +1,11 @@
 use crate::{
     ComplicatedPolygonGeometry, GeometryBlock, LinestringGeometry, PointGeometry, PolygonPart,
-    Ring, RingPart, SimplePolygonGeometry, LonLat,
+    Ring, RingPart, SimplePolygonGeometry, LonLat, WithBounds, CallFinishGeometryBlock, Timings
 };
 
-use osmquadtree::elements::{pack_head, PackStringTable, read_stringtable, read_common, Quadtree};
+use osmquadtree::elements::{pack_head, PackStringTable, read_stringtable, read_common, Quadtree, Bbox};
+use osmquadtree::mergechanges::{read_filter,Poly};
+
 use simple_protocolbuffers::{
     data_length, pack_data, pack_delta_int, pack_delta_int_ref, pack_value, zig_zag, un_zig_zag, PbfTag, IterTags, read_delta_packed_int
 };
@@ -491,3 +493,137 @@ pub fn unpack_geometry_block(idx: i64, data: &[u8]) -> Result<GeometryBlock> {
     
     
 }
+
+pub enum GeometryFilter {
+    Null,
+    Bbox(Bbox),
+    Poly(Poly)
+}
+
+impl GeometryFilter {
+    pub fn check<T: WithBounds>(&self, obj: &T) -> bool {
+        match self {
+            GeometryFilter::Null => true,
+            GeometryFilter::Bbox(b) => b.overlaps(&obj.bounds()),
+            GeometryFilter::Poly(p) => p.check_box(&obj.bounds())
+        }
+    }
+    pub fn is_null(&self) -> bool {
+        match self {
+            GeometryFilter::Null => true,
+            GeometryFilter::Bbox(b) => b.is_planet(),
+            _ => false
+        }
+    }
+}
+            
+                    
+fn max_minzoom_check(test_minzoom: &Option<i64>, val_minzoom: &Option<i64>) -> bool {
+    match (val_minzoom, test_minzoom) {
+        (_, None) => true,
+        (None, Some(_)) => false,
+        (Some(v), Some(t)) => v <= t
+    }
+}
+
+fn unpack_group_filter(gb: &mut GeometryBlock, strs: &Vec<String>, data: &[u8], filter: &GeometryFilter, max_minzoom: &Option<i64>) -> Result<()> {
+    
+    for tg in IterTags::new(&data) {
+        match tg {
+            PbfTag::Data(20, d) => {
+                let p = unpack_point_geometry(&strs, &d)?;
+                if filter.check(&p) && max_minzoom_check(max_minzoom, &p.minzoom) { 
+                    gb.points.push(p);
+                }
+            },
+            PbfTag::Data(21, d) => {
+                let p = unpack_linestring_geometry(&strs, &d)?;
+                if filter.check(&p) && max_minzoom_check(max_minzoom, &p.minzoom) { 
+                    gb.linestrings.push(p);
+                }
+            },
+            PbfTag::Data(22, d) => {
+                let p = unpack_simplepolygon_geometry(&strs, &d)?;
+                if filter.check(&p) && max_minzoom_check(max_minzoom, &p.minzoom) { 
+                    gb.simple_polygons.push(p);
+                }
+            },
+            PbfTag::Data(23, d) => {
+                let p = unpack_complicated_polygon_geometry(&strs, &d)?;
+                if filter.check(&p) && max_minzoom_check(max_minzoom, &p.minzoom) { 
+                    gb.complicated_polygons.push(p);
+                }
+            },
+            _ => {},
+        }
+    }
+    Ok(())
+}
+    
+
+pub fn unpack_geometry_block_filter(idx: i64, data: &[u8], filter: &GeometryFilter, max_minzoom: &Option<i64>) -> Result<GeometryBlock> {
+    if filter.is_null() && max_minzoom.is_none() {
+        return unpack_geometry_block(idx, data);
+    }
+    
+    let mut gb = GeometryBlock::new(idx, Quadtree::empty(),  0);
+    
+    let mut strs = Vec::new();
+    for tg in IterTags::new(&data) {
+        match tg {
+            PbfTag::Data(1, d) => { strs = read_stringtable(&d)?; },
+            PbfTag::Data(2, d) => { unpack_group_filter(&mut gb, &strs, &d, filter, max_minzoom)?; },
+            PbfTag::Value(32, q) => { gb.quadtree = Quadtree::new(un_zig_zag(q)); },
+            PbfTag::Value(34, q) => { gb.end_date = q as i64; },
+            _ => {}
+        }
+    }
+    Ok(gb)
+    
+    
+}
+
+use channelled_callbacks::{/*CallFinish,Timings,CallbackSync,CallbackMerge,*/CallAll};
+use osmquadtree::message;
+use osmquadtree::pbfformat::{get_file_locs,read_all_blocks_parallel_with_progbar,FileBlock};
+use std::sync::Arc;
+
+pub fn read_geometry_blocks(
+    infn: &str, cb: CallFinishGeometryBlock, filter_str: Option<&str>, max_minzoom: Option<i64>, numchan: usize) -> Result<Timings> {
+    
+    let (bx, poly) = read_filter(filter_str)?;
+    
+    let geometry_filter = Arc::new( {
+        if filter_str.is_none() {
+            GeometryFilter::Null
+        } else if let Some(pp) = poly {
+            GeometryFilter::Poly(pp)
+        } else {
+            GeometryFilter::Bbox(bx.clone())
+        }
+    });
+    
+    
+    let mut pfilelocs = get_file_locs(infn, Some(bx), None)?;
+    
+    let r = if numchan == 0 {
+        let cc = Box::new(CallAll::new(
+            cb, "UnpackGeometry", 
+            Box::new(move |(i,fb): (usize,Vec<FileBlock>)| {
+                unpack_geometry_block_filter(i as i64, &fb[0].data(), &geometry_filter, &max_minzoom).unwrap()
+            })
+        ));
+        
+        Ok(read_all_blocks_parallel_with_progbar(&mut pfilelocs.0, &pfilelocs.1, cc, "read geometry blocks", pfilelocs.2))
+    } else {
+        Err(Error::new(ErrorKind::Other, "not impl"))
+    }?;
+    
+    message!("{}", r);
+    
+    Ok(r)
+}
+    
+        
+        
+        

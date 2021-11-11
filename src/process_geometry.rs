@@ -1,7 +1,7 @@
 pub use crate::postgresql::{make_write_postgresql_geometry, PostgresqlOptions};
 
 use crate::addparenttag::AddParentTag;
-use crate::elements::GeoJsonable;
+use crate::elements::{GeoJsonable,WithBounds};
 use crate::minzoom::{FindMinZoom, MinZoomSpec};
 use crate::multipolygons::ProcessMultiPolygons;
 

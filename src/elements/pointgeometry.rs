@@ -1,5 +1,5 @@
 use osmquadtree::elements::{Info, Node, Quadtree, Tag,coordinate_as_float, Bbox};
-use crate::elements::GeoJsonable;
+use crate::elements::{GeoJsonable,WithBounds};
 use crate::wkb::{prep_wkb, write_point};
 
 use crate::LonLat;
@@ -29,6 +29,13 @@ pub struct PointGeometry {
     pub quadtree: Quadtree,
 }
 
+impl WithBounds for PointGeometry {
+    fn bounds(&self) -> Bbox {
+        Bbox::from_point(self.lonlat.lon,self.lonlat.lat)
+    }
+}
+
+
 impl PointGeometry {
     
     pub fn empty() -> PointGeometry {
@@ -51,10 +58,6 @@ impl PointGeometry {
         geo::Point(self.lonlat.to_xy(transform))
     }
     */
-    pub fn bounds(&self) -> Bbox {
-        Bbox::from_point(self.lonlat.lon,self.lonlat.lat)
-    }
-    
     
     pub fn to_geometry_geojson(&self, transform: bool) -> std::io::Result<Value> {
         //let geom = geojson::Value::from(&self.to_geo(false));

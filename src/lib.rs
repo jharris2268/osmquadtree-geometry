@@ -22,7 +22,7 @@ pub use crate::waywithnodes::CollectWayNodes;
 
 pub use crate::elements::{
     ComplicatedPolygonGeometry, LinestringGeometry, PointGeometry, PolygonPart, Ring, RingPart,
-    SimplePolygonGeometry, GeoJsonable
+    SimplePolygonGeometry, GeoJsonable, WithBounds
 };
 pub use crate::geometry_block::{GeometryElement,GeometryBlock};
 pub use crate::process_geometry::{process_geometry, OutputType, StoreBlocks,process_geometry_call};
@@ -30,6 +30,8 @@ pub use crate::style::GeometryStyle;
 pub use crate::tempfile::{prep_write_geometry_pbffile, make_write_temp_geometry, write_temp_geometry};
 pub use crate::minzoom::{FindMinZoom, MinZoomSpec};
 pub use crate::default_minzoom_values::DEFAULT_MINZOOM_VALUES;
+
+pub use pack_geometry::read_geometry_blocks;
 
 use std::collections::BTreeMap;
 

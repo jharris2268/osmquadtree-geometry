@@ -2,7 +2,7 @@ use osmquadtree::elements::{Bbox, Info, Quadtree, Relation, Tag};
 
 use crate::elements::pointgeometry::pack_tags;
 use crate::elements::simplepolygongeometry::{pack_bounds, read_lonlats};
-use crate::elements::GeoJsonable;
+use crate::elements::{GeoJsonable,WithBounds};
 use crate::position::calc_ring_area_and_bbox;
 use crate::wkb::{prep_wkb, write_ring, write_uint32, /*AsWkb*/};
 use crate::LonLat;
@@ -448,6 +448,18 @@ pub struct ComplicatedPolygonGeometry {
     pub minzoom: Option<i64>,
     pub quadtree: Quadtree,
 }
+impl WithBounds for ComplicatedPolygonGeometry {
+    fn bounds(&self) -> Bbox {
+        let mut res = Bbox::empty();
+        for p in &self.parts {
+            for l in &p.exterior.lonlats().unwrap() {
+                res.expand(l.lon, l.lat);
+            }
+        }
+        res
+    }
+}
+
 
 impl ComplicatedPolygonGeometry {
     pub fn empty() -> ComplicatedPolygonGeometry {
@@ -523,15 +535,7 @@ impl ComplicatedPolygonGeometry {
         }
     }
 
-    pub fn bounds(&self) -> Bbox {
-        let mut res = Bbox::empty();
-        for p in &self.parts {
-            for l in &p.exterior.lonlats().unwrap() {
-                res.expand(l.lon, l.lat);
-            }
-        }
-        res
-    }
+    
 
     pub fn to_geometry_geojson(&self, transform: bool) -> std::io::Result<Value> {
         let mut res = Map::new();

@@ -1,7 +1,7 @@
 use osmquadtree::elements::{coordinate_as_float, Bbox, Info, Quadtree, Tag, Way};
 
 use crate::elements::pointgeometry::pack_tags;
-use crate::elements::GeoJsonable;
+use crate::elements::{GeoJsonable,WithBounds};
 use crate::wkb::{prep_wkb, write_ring, write_uint32};
 use crate::LonLat;
 use serde::Serialize;
@@ -55,7 +55,15 @@ pub struct SimplePolygonGeometry {
     pub minzoom: Option<i64>,
     pub quadtree: Quadtree,
 }
-
+impl WithBounds for SimplePolygonGeometry {
+    fn bounds(&self) -> Bbox {
+        let mut res = Bbox::empty();
+        for l in &self.lonlats {
+            res.expand(l.lon, l.lat);
+        }
+        res
+    }
+}
 impl SimplePolygonGeometry {
     pub fn empty() -> SimplePolygonGeometry {
         SimplePolygonGeometry{id: 0, info: None, tags: Vec::new(), refs: Vec::new(), lonlats: Vec::new(),
@@ -104,13 +112,7 @@ impl SimplePolygonGeometry {
         Ok(res)
     }
 
-    pub fn bounds(&self) -> Bbox {
-        let mut res = Bbox::empty();
-        for l in &self.lonlats {
-            res.expand(l.lon, l.lat);
-        }
-        res
-    }
+    
 
     pub fn to_geometry_geojson(&self, transform: bool) -> std::io::Result<Value> {
         let mut res = Map::new();
