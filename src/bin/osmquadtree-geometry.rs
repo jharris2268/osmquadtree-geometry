@@ -107,7 +107,7 @@ fn main() {
                 .arg(Arg::with_name("FIND_MINZOOM").short("-m").long("--minzoom").help("find minzoom"))
                 .arg(Arg::with_name("STYLE_NAME").short("-s").long("--style").takes_value(true).help("style json filename"))
                 .arg(Arg::with_name("MAX_MINZOOM").short("-M").long("--maxminzoom").takes_value(true).help("maximum minzoom value"))
-                .arg(Arg::with_name("SORT").short("-S").long("--short").help("sort out pbffile"))
+                .arg(Arg::with_name("SORT").short("-S").long("--sort").help("sort out pbffile"))
                 .arg(Arg::with_name("NUMCHAN").short("-n").long("--numchan").takes_value(true).help("uses NUMCHAN parallel threads"))
         )
         .subcommand(
