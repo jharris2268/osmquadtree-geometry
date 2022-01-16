@@ -26,6 +26,7 @@ simple-protocolbuffers = { git = "https://github.com/jharris2268/simple-protocol
 channelled-callbacks = { git = "https://github.com/jharris2268/channelled-callbacks.git", branch = "main" }
 osmquadtree = { git = "https://github.com/jharris2268/osmquadtree-rust.git", branch = "main" }
 
+num_cpus = "*"
 
 [profile.release]
 #debug = true

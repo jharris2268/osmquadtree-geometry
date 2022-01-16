@@ -281,9 +281,9 @@ fn prepare_writepostgresdata(
 
     for (i, qu) in before.iter().enumerate() {
         let tx = Timer::new();
-        message!("{} {:100.100} ", i, qu);
+        print!("{:2} {:100.100} ", i, qu);
         conn.execute(&qu)?;
-        message!(": {:.1}s", tx.since());
+        println!(": {:.1}s", tx.since());
     }
     let wpg = Box::new(WritePostgresData::new(conn, copy, exec_after, after));
     if newthread {
@@ -367,22 +367,22 @@ impl CallFinish for WritePostgresData {
         if self.exec_after {
             for (i, qu) in self.after.iter().enumerate() {
                 let tx = Timer::new();
-                message!("{} {:100.100} ", i, qu);
+                print!("{:2} {:100.100} ", i, qu);
                 std::io::stdout().flush().unwrap();
 
                 match conn.execute(&qu) {
                     Ok(_) => {}
                     Err(e) => {
-                        message!(" FAILED {:?}", e);
+                        print!(" FAILED {:?}", e);
                     }
                 };
-                message!(": {:.1}s", tx.since());
+                println!(": {:.1}s", tx.since());
             }
         } else {
-            message!("indices:");
-            for a in &self.after {
-                message!("{};", a);
-            }
+            message!("indices:\n{}", self.after.join("\n"));
+            //for a in &self.after {
+            //    message!("{};", a);
+            //}
         }
         tm.add("WritePostgresData::finish", txx.since());
 

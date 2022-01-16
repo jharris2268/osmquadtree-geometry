@@ -45,7 +45,7 @@ fn get_i64(x: Option<&str>) -> Option<i64> {
     }
 }
 
-const NUMCHAN_DEFAULT: usize = 4;
+//const NUMCHAN_DEFAULT: usize = 4;
 /*const RAM_GB_DEFAULT: usize= 8;
 const QT_MAX_LEVEL_DEFAULT: usize = 18;
 const QT_GRAPH_LEVEL_DEFAULT: usize = 17;
@@ -56,6 +56,8 @@ const QT_BUFFER_DEFAULT: f64 = 0.05;
 fn main() {
     // basic app information
     register_messenger_default().expect("!!");
+    
+    let numchan_default = num_cpus::get();
     
     
     let app = App::new("osmquadtree-geometry")
@@ -169,6 +171,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("show_after_queries")
+                .arg(Arg::with_name("OUTFN").short("-o").long("--outfn").takes_value(true).help("writes queries to txt (or json) file"))
                 .arg(Arg::with_name("TABLE_PREFIX").short("-p").long("--tableprefix").takes_value(true).help("table prfx"))
                 .arg(Arg::with_name("EXTENDED").short("-e").long("--extended").help("extended table spec"))
         )
@@ -187,7 +190,7 @@ fn main() {
             geom.is_present("FIND_MINZOOM"),
             geom.value_of("STYLE_NAME"),
             get_i64(geom.value_of("MAX_MINZOOM")),
-            value_t!(geom, "NUMCHAN", usize).unwrap_or(NUMCHAN_DEFAULT),
+            value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
         ),
         ("process_geometry_json", Some(geom)) => process_geometry(
             geom.value_of("INPUT").unwrap(),
@@ -197,7 +200,7 @@ fn main() {
             geom.is_present("FIND_MINZOOM"),
             geom.value_of("STYLE_NAME"),
             get_i64(geom.value_of("MAX_MINZOOM")),
-            value_t!(geom, "NUMCHAN", usize).unwrap_or(NUMCHAN_DEFAULT),
+            value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
         ),
         ("process_geometry_tiled_json", Some(geom)) => process_geometry(
             geom.value_of("INPUT").unwrap(),
@@ -207,7 +210,7 @@ fn main() {
             geom.is_present("FIND_MINZOOM"),
             geom.value_of("STYLE_NAME"),
             get_i64(geom.value_of("MAX_MINZOOM")),
-            value_t!(geom, "NUMCHAN", usize).unwrap_or(NUMCHAN_DEFAULT),
+            value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
         ),
         ("process_geometry_pbffile", Some(geom)) => {
             
@@ -225,7 +228,7 @@ fn main() {
                 geom.is_present("FIND_MINZOOM"),
                 geom.value_of("STYLE_NAME"),
                 get_i64(geom.value_of("MAX_MINZOOM")),
-                value_t!(geom, "NUMCHAN", usize).unwrap_or(NUMCHAN_DEFAULT),
+                value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
             )
         },
         ("process_geometry_postgresqlnull", Some(geom)) => {
@@ -243,7 +246,7 @@ fn main() {
                 geom.is_present("FIND_MINZOOM"),
                 geom.value_of("STYLE_NAME"),
                 get_i64(geom.value_of("MAX_MINZOOM")),
-                value_t!(geom, "NUMCHAN", usize).unwrap_or(NUMCHAN_DEFAULT),
+                value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
             )
         }
         ("process_geometry_postgresqlblob", Some(geom)) => {
@@ -262,7 +265,7 @@ fn main() {
                 geom.is_present("FIND_MINZOOM"),
                 geom.value_of("STYLE_NAME"),
                 get_i64(geom.value_of("MAX_MINZOOM")),
-                value_t!(geom, "NUMCHAN", usize).unwrap_or(NUMCHAN_DEFAULT),
+                value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
             )
         }
         ("process_geometry_postgresqlblob_pbf", Some(geom)) => {
@@ -281,7 +284,7 @@ fn main() {
                 geom.is_present("FIND_MINZOOM"),
                 geom.value_of("STYLE_NAME"),
                 get_i64(geom.value_of("MAX_MINZOOM")),
-                value_t!(geom, "NUMCHAN", usize).unwrap_or(NUMCHAN_DEFAULT),
+                value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
             )
         }
         ("process_geometry_postgresql", Some(geom)) => {
@@ -290,11 +293,15 @@ fn main() {
                 String::from(geom.value_of("TABLE_PREFIX").unwrap()),
                 geom.is_present("EXEC_INDICES"),
             ));
-            let po = if geom.is_present("EXTENDED") {
+            let mut po = if geom.is_present("EXTENDED") {
                 PostgresqlOptions::extended(pc, &GeometryStyle::default())
             } else {
                 PostgresqlOptions::osm2pgsql(pc, &GeometryStyle::default())
             };
+            if geom.is_present("EXEC_INDICES") {
+                po.planet_osm_views = true;
+                po.lowzoom = Some(vec![("lz6_".to_string(), 6, true), ("lz9_".to_string(), 9, false), ("lz11_".to_string(), 11, false)]);
+            }
             process_geometry(
                 geom.value_of("INPUT").unwrap(),
                 OutputType::Postgresql(po),
@@ -303,7 +310,7 @@ fn main() {
                 geom.is_present("FIND_MINZOOM"),
                 geom.value_of("STYLE_NAME"),
                 get_i64(geom.value_of("MAX_MINZOOM")),
-                value_t!(geom, "NUMCHAN", usize).unwrap_or(NUMCHAN_DEFAULT),
+                value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
             )
         }
         ("dump_geometry_style", Some(geom)) => dump_geometry_style(geom.value_of("OUTPUT")),
@@ -316,12 +323,30 @@ fn main() {
                 } else {
                     PostgresqlOptions::osm2pgsql(pc, &GeometryStyle::default())
                 };
-                let lz = if po.extended { Some(Vec::from([(String::from("lz6_"),6,true),(String::from("lz9_"),9,false),(String::from("lz11_"),11,false)])) } else {None};
-                message!("{}", prepare_tables(geom.value_of("TABLE_PREFIX"), 
+                let lz = /*if po.extended { */
+                    Some(Vec::from([(String::from("lz6_"),6,true),(String::from("lz9_"),9,false),(String::from("lz11_"),11,false)]))
+                /*} else {
+                    None
+                }*/;
+                let pt = prepare_tables(geom.value_of("TABLE_PREFIX"), 
                     &po.table_spec, 
                     po.extended,
-                    po.extended,
-                    &lz)?.2.join("\n"));
+                    true,//po.extended,
+                    &lz)?;
+                match geom.value_of("OUTFN") {
+                    None => message!("{}", pt.2.join("\n")),
+                    Some(f) => {
+                        if f.ends_with(".json") {
+                            let s = serde_json::to_string_pretty(&pt.2).or_else(|e| Err(Error::new(ErrorKind::Other, format!("?? {}",e))))?+"\n";
+                            
+                            std::fs::write(f, &s)?;
+                        } else if f.ends_with(".sql") {
+                            std::fs::write(f, &(pt.2.join(";\n")+"\n"))?;
+                        } else {
+                            std::fs::write(f, &(pt.2.join("\n")+"\n"))?;
+                        }
+                    }
+                }
                 Ok(())
             })()
         },
