@@ -87,10 +87,11 @@ pub fn prepare_tables(
 ) -> std::io::Result<(Vec<String>, Vec<String>, Vec<String>)> {
     let table_queries: BTreeMap<String, Vec<(TableQueryType, String)>> =
         serde_json::from_str(&TABLE_QUERIES).or_else(|e| Err(Error::new(ErrorKind::Other, format!("TABLE_QUERIES? {}", e))))?;
-
+    
     let mut before = Vec::new();
     let mut after = Vec::new();
     let mut copy = Vec::new();
+    let mut final_qus=Vec::new();
     for t in spec {
         let tname = match prfx {
             Some(prfx) => format!("{}{}", prfx, &t.name),
@@ -122,7 +123,12 @@ pub fn prepare_tables(
                 }
             }
         }
+        final_qus.push(format!("VACUUM ANALYZE {}", tname));
+        final_qus.push(format!("ALTER TABLE {} SET (autovacuum_enabled = true)", tname));
+        
     }
+    
+    
     if planet_osm_views {
         
         let planet_osm_queries: Vec<(TableQueryType, String)> =
@@ -139,11 +145,11 @@ pub fn prepare_tables(
                 
             }
         }
-        final_qus.push("VACUUM ANALYZE planet_osm_roads");
+        final_qus.push(format!("VACUUM ANALYZE planet_osm_roads"));
         
 
     }
-    let mut final_qus=Vec::new();
+    
     match lowzoom {
         None => {},
         Some(lowzoom) => {
@@ -163,12 +169,6 @@ pub fn prepare_tables(
     }
     
     
-    for t in spec {
-        let tn = format!("{}{}", prfx.unwrap_or(""), t.name);
-        
-        after.push(format!("VACUUM ANALYZE {}", tn));
-        after.push(format!("ALTER TABLE {} SET (autovacuum_enabled = true)", tn));
-    }
     after.extend(final_qus);
     
     //move_vacuum_to_end(&mut after);
@@ -274,7 +274,7 @@ const PLANET_OSM_QUERIES: &str = r#"[
 ["Extended", "drop view if exists planet_osm_highway"],
 ["Extended", "drop view if exists planet_osm_building"],
 ["Extended","drop view if exists planet_osm_boundary"],
-["Extended","drop view if exists planet_osm_polygon_point"],
+["Extended","drop view if exists planet_osm_polygon_way_point"],
 ["All","create view planet_osm_point as (select * from %ZZ%point)"],
 ["Extended","create view planet_osm_line as (select * from %ZZ%line union all select * from %ZZ%highway)"],
 ["Osm2pgsql","create view planet_osm_line as select * from %ZZ%line"],
@@ -287,7 +287,7 @@ const PLANET_OSM_QUERIES: &str = r#"[
 ["Extended","create view planet_osm_highway as (select * from %ZZ%highway)"],
 ["Extended","create view planet_osm_building as (select * from %ZZ%building)"],
 ["Extended","create view planet_osm_boundary as (select * from %ZZ%boundary)"],
-["Extended","create view planet_osm_polygon_point as select * from %ZZ%polygon_point"]
+["Extended","create view planet_osm_polygon_point as select * from %ZZ%polygon_way_point"]
 ]
 "#;
 //["All","vacuum analyze planet_osm_roads"],
