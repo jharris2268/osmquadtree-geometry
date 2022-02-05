@@ -17,8 +17,8 @@ mod tempfile;
 
 use osmquadtree::elements::{Element, Node, Quadtree, Relation, Way};
 use osmquadtree::sortblocks::TempData;
-pub use crate::position::{get_srid, LonLat, XY};
-pub use crate::waywithnodes::CollectWayNodes;
+pub use crate::position::{get_srid, LonLat, XY,calc_line_length};
+pub use crate::waywithnodes::{CollectWayNodes,Locations};
 
 pub use crate::elements::{
     ComplicatedPolygonGeometry, LinestringGeometry, PointGeometry, PolygonPart, Ring, RingPart,
@@ -36,11 +36,11 @@ pub use pack_geometry::read_geometry_blocks;
 use std::collections::BTreeMap;
 
 pub struct WorkingBlock {
-    geometry_block: GeometryBlock,
+    pub geometry_block: GeometryBlock,
 
-    pending_nodes: Vec<Node>,
-    pending_ways: Vec<(Way, Vec<LonLat>)>,
-    pending_relations: Vec<Relation>,
+    pub pending_nodes: Vec<Node>,
+    pub pending_ways: Vec<(Way, Vec<LonLat>)>,
+    pub pending_relations: Vec<Relation>,
 }
 impl WorkingBlock {
     pub fn new(index: i64, quadtree: Quadtree, end_date: i64) -> WorkingBlock {

@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 type LocTile = BTreeMap<i64, LonLat>;
 
-struct Locations {
+pub struct Locations {
     tiles: BTreeMap<Quadtree, LocTile>,
     max_len: usize,
 
@@ -88,6 +88,33 @@ impl Locations {
         self.max_locs = i64::max(self.max_locs, self.num_locs);
         res
     }
+    
+    
+    pub fn process_tile(&mut self, pb: PrimitiveBlock) -> Result<(WorkingBlock,Vec<(Element,String)>)> {
+        let mut res =
+            WorkingBlock::new(pb.get_index(), pb.get_quadtree().clone(), pb.get_end_date());
+        let mut errs = Vec::new();
+        
+        self.remove_finished_tiles(&pb.quadtree);
+        res.pending_nodes = self.add_tile(pb.quadtree, pb.nodes);
+
+        for w in pb.ways {
+            match self.get_locs(&w.refs) {
+                Ok(rr) => {
+                    res.pending_ways.push((w, rr));
+                }
+                Err(e) => {
+                    errs.push((Element::Way(w), e.to_string()));
+                }
+            }
+        }
+
+        res.pending_relations = pb.relations;
+
+        Ok((res,errs))
+    }
+    
+    
 }
 impl std::fmt::Display for Locations {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -132,28 +159,7 @@ where
         }
     }
 
-    pub fn process_tile(&mut self, pb: PrimitiveBlock) -> Result<WorkingBlock> {
-        let mut res =
-            WorkingBlock::new(pb.get_index(), pb.get_quadtree().clone(), pb.get_end_date());
-
-        self.locs.remove_finished_tiles(&pb.quadtree);
-        res.pending_nodes = self.locs.add_tile(pb.quadtree, pb.nodes);
-
-        for w in pb.ways {
-            match self.locs.get_locs(&w.refs) {
-                Ok(rr) => {
-                    res.pending_ways.push((w, rr));
-                }
-                Err(e) => {
-                    self.errs.push((Element::Way(w), e.to_string()));
-                }
-            }
-        }
-
-        res.pending_relations = pb.relations;
-
-        Ok(res)
-    }
+    
 }
 
 impl<T> CallFinish for CollectWayNodes<T>
@@ -165,7 +171,8 @@ where
 
     fn call(&mut self, pb: PrimitiveBlock) {
         let tx = ThreadTimer::new();
-        let r = self.process_tile(pb).expect("!!");
+        let (r,errs) = self.locs.process_tile(pb).expect("!!");
+        self.errs.extend(errs);
         self.tm += tx.since();
         self.out.call(r);
     }
