@@ -287,7 +287,7 @@ const PLANET_OSM_QUERIES: &str = r#"[
 ["Extended","create view planet_osm_highway as (select * from %ZZ%highway)"],
 ["Extended","create view planet_osm_building as (select * from %ZZ%building)"],
 ["Extended","create view planet_osm_boundary as (select * from %ZZ%boundary)"],
-["Extended","create view planet_osm_polygon_point as select * from %ZZ%polygon_way_point"]
+["Extended","create view planet_osm_polygon_way_point as (select * from %ZZ%polygon_way_point)"]
 ]
 "#;
 //["All","vacuum analyze planet_osm_roads"],
