@@ -1,7 +1,7 @@
 use osmquadtree::sortblocks::{QuadtreeTree, WriteTempData, WriteTempFile, WriteTempFileSplit, TempData,SortBlocks,CollectTemp,read_temp_data};
 use channelled_callbacks::{CallFinish, Callback, CallbackMerge, CallbackSync, CallAll, MergeTimings, ReplaceNoneWithTimings};
 use osmquadtree::utils::ThreadTimer;
-use osmquadtree::pbfformat::{HeaderType, FileBlock, WriteFile, pack_file_block,ParallelFileLocs};
+use osmquadtree::pbfformat::{HeaderType, FileBlock, WriteFile, pack_file_block,ParallelFileLocs,CompressionType};
 
 use crate::{GeometryBlock,CallFinishGeometryBlock,Timings,OtherData};
 use osmquadtree::elements::{Bbox,};
@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 fn pack_geom(bl: GeometryBlock) -> Vec<(i64, Vec<u8>)> {
     let p = bl.pack().expect("!");
-    let q = pack_file_block("OSMData", &p, true).expect("?");
+    let q = pack_file_block("OSMData", &p, &CompressionType::Zlib).expect("?");
 
     vec![(bl.quadtree.as_int(), q)]
 }
@@ -156,7 +156,7 @@ where
         let mut xx = Vec::new();
         for (a,b) in mm {
             let p = b.pack().expect("!");
-            let q = pack_file_block("OSMData", &p, true).expect("?");
+            let q = pack_file_block("OSMData", &p, &CompressionType::Zlib).expect("?");
             xx.push((a,q));
         }
         self.tm += tx.since();
@@ -171,7 +171,7 @@ where
         let mut xx = Vec::new();
         for (a,b) in mm {
             let p = b.pack().expect("!");
-            let q = pack_file_block("OSMData", &p, true).expect("?");
+            let q = pack_file_block("OSMData", &p, &CompressionType::Zlib).expect("?");
             xx.push((a,q));
         }
         let tf=tx.since();

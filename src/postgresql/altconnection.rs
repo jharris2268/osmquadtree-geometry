@@ -114,7 +114,7 @@ impl Connection {
             let res = PQexec(self.conn, sql_cstr.as_ptr());
             if PQresultStatus(res) != PGRES_COMMAND_OK {
                 PQclear(res);
-                println!("\n{}",sql);
+                message!("\n{}",sql);
                 return Err(Error::new(ErrorKind::Other, "failed to execute"));
             }
             PQclear(res);

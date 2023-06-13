@@ -14,10 +14,10 @@ pub use crate::postgresql::tablespec::{
 };
 pub use crate::postgresql::writepostgresql::make_write_postgresql_geometry;
 
-mod altconnection;
-pub use crate::postgresql::altconnection::Connection;
+//mod altconnection;
+//pub use crate::postgresql::altconnection::Connection;
 
-//mod postgresconnection;
-//pub use crate::geometry::postgresql::postgresconnection::Connection;
+mod postgresconnection;
+pub use crate::postgresql::postgresconnection::Connection;
 
 pub use crate::postgresql::geosgeometry::GeosGeometry;

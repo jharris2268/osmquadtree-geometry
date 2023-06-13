@@ -5,7 +5,7 @@ use crate::postgresql::{
     PrepTable, TableSpec,
 };
 use crate::{GeometryBlock, OtherData, Timings};
-use osmquadtree::pbfformat::{pack_file_block, HeaderType, WriteFile};
+use osmquadtree::pbfformat::{pack_file_block, HeaderType, WriteFile, CompressionType};
 use osmquadtree::utils::{ThreadTimer, Timer};
 use osmquadtree::message;
 use simple_protocolbuffers::{pack_data, pack_value};
@@ -228,7 +228,7 @@ fn pack_pbf_blobs(pbbs: Vec<PackedBlob>) -> Vec<(i64, Vec<u8>)> {
 
             res.push((
                 p.table as i64,
-                pack_file_block("BlobData", &packed, true).expect("!"),
+                pack_file_block("BlobData", &packed, &CompressionType::Zlib).expect("!"),
             ));
         }
     }
@@ -244,7 +244,7 @@ fn make_write_packed_pbffile(
     let header = serde_json::to_vec(&CopySpec::new(tabs, tabs.len() > 3)).expect("!");
     wf.call(vec![(
         -1,
-        pack_file_block("BlobHeaderJson", &header, true).expect("!"),
+        pack_file_block("BlobHeaderJson", &header, &CompressionType::Zlib).expect("!"),
     )]);
 
     if numchan == 0 {

@@ -238,16 +238,21 @@ fn main() {
             } else {
                 PostgresqlOptions::osm2pgsql(pc, &GeometryStyle::default())
             };
-            process_geometry(
-                geom.value_of("INPUT").unwrap(),
-                OutputType::Postgresql(po),
-                geom.value_of("FILTER"),
-                geom.value_of("TIMESTAMP"),
-                geom.is_present("FIND_MINZOOM"),
-                geom.value_of("STYLE_NAME"),
-                get_i64(geom.value_of("MAX_MINZOOM")),
-                value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
-            )
+            if geom.is_present("EXTENDED") && !geom.is_present("FIND_MINZOOM") {
+                Err(Error::new(ErrorKind::Other, "find_minzoom must be called with extended table format!"))
+            } else {
+                
+                process_geometry(
+                    geom.value_of("INPUT").unwrap(),
+                    OutputType::Postgresql(po),
+                    geom.value_of("FILTER"),
+                    geom.value_of("TIMESTAMP"),
+                    geom.is_present("FIND_MINZOOM"),
+                    geom.value_of("STYLE_NAME"),
+                    get_i64(geom.value_of("MAX_MINZOOM")),
+                    value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
+                )
+            }
         }
         ("process_geometry_postgresqlblob", Some(geom)) => {
             let pc =
@@ -257,16 +262,21 @@ fn main() {
             } else {
                 PostgresqlOptions::osm2pgsql(pc, &GeometryStyle::default())
             };
-            process_geometry(
-                geom.value_of("INPUT").unwrap(),
-                OutputType::Postgresql(po),
-                geom.value_of("FILTER"),
-                geom.value_of("TIMESTAMP"),
-                geom.is_present("FIND_MINZOOM"),
-                geom.value_of("STYLE_NAME"),
-                get_i64(geom.value_of("MAX_MINZOOM")),
-                value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
-            )
+            if geom.is_present("EXTENDED") && !geom.is_present("FIND_MINZOOM") {
+                Err(Error::new(ErrorKind::Other, "find_minzoom must be called with extended table format!"))
+            } else {
+                
+                    process_geometry(
+                    geom.value_of("INPUT").unwrap(),
+                    OutputType::Postgresql(po),
+                    geom.value_of("FILTER"),
+                    geom.value_of("TIMESTAMP"),
+                    geom.is_present("FIND_MINZOOM"),
+                    geom.value_of("STYLE_NAME"),
+                    get_i64(geom.value_of("MAX_MINZOOM")),
+                    value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
+                )
+            }
         }
         ("process_geometry_postgresqlblob_pbf", Some(geom)) => {
             let pc =
@@ -276,16 +286,21 @@ fn main() {
             } else {
                 PostgresqlOptions::osm2pgsql(pc, &GeometryStyle::default())
             };
-            process_geometry(
-                geom.value_of("INPUT").unwrap(),
-                OutputType::Postgresql(po),
-                geom.value_of("FILTER"),
-                geom.value_of("TIMESTAMP"),
-                geom.is_present("FIND_MINZOOM"),
-                geom.value_of("STYLE_NAME"),
-                get_i64(geom.value_of("MAX_MINZOOM")),
-                value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
-            )
+            if geom.is_present("EXTENDED") && !geom.is_present("FIND_MINZOOM") {
+                Err(Error::new(ErrorKind::Other, "find_minzoom must be called with extended table format!"))
+            } else {
+                
+                process_geometry(
+                    geom.value_of("INPUT").unwrap(),
+                    OutputType::Postgresql(po),
+                    geom.value_of("FILTER"),
+                    geom.value_of("TIMESTAMP"),
+                    geom.is_present("FIND_MINZOOM"),
+                    geom.value_of("STYLE_NAME"),
+                    get_i64(geom.value_of("MAX_MINZOOM")),
+                    value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
+                )
+            }
         }
         ("process_geometry_postgresql", Some(geom)) => {
             let pc = PostgresqlConnection::Connection((
@@ -302,16 +317,22 @@ fn main() {
                 po.planet_osm_views = true;
                 po.lowzoom = Some(vec![("lz6_".to_string(), 6, true), ("lz9_".to_string(), 9, false), ("lz11_".to_string(), 11, false)]);
             }
-            process_geometry(
-                geom.value_of("INPUT").unwrap(),
-                OutputType::Postgresql(po),
-                geom.value_of("FILTER"),
-                geom.value_of("TIMESTAMP"),
-                geom.is_present("FIND_MINZOOM"),
-                geom.value_of("STYLE_NAME"),
-                get_i64(geom.value_of("MAX_MINZOOM")),
-                value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
-            )
+            if geom.is_present("EXTENDED") && !geom.is_present("FIND_MINZOOM") {
+                Err(Error::new(ErrorKind::Other, "find_minzoom must be called with extended table format!"))
+            } else {
+                
+                
+                process_geometry(
+                    geom.value_of("INPUT").unwrap(),
+                    OutputType::Postgresql(po),
+                    geom.value_of("FILTER"),
+                    geom.value_of("TIMESTAMP"),
+                    geom.is_present("FIND_MINZOOM"),
+                    geom.value_of("STYLE_NAME"),
+                    get_i64(geom.value_of("MAX_MINZOOM")),
+                    value_t!(geom, "NUMCHAN", usize).unwrap_or(numchan_default),
+                )
+            }
         }
         ("dump_geometry_style", Some(geom)) => dump_geometry_style(geom.value_of("OUTPUT")),
         
