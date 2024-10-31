@@ -2,14 +2,14 @@ use osmquadtree::elements::{Block, Quadtree, WithQuadtree};
 use crate::elements::GeoJsonable;
 use crate::pack_geometry::{pack_geometry_block, unpack_geometry_block};
 use crate::{
-    ComplicatedPolygonGeometry, LinestringGeometry, PointGeometry, SimplePolygonGeometry,
+    ComplicatedPolygonGeometry, LinestringGeometry, PointGeometry, SimplePolygonGeometry, Result
 };
 
 use osmquadtree::utils::timestamp_string;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::fmt;
-use std::io::{/*Error, ErrorKind,*/ Result};
+
 
 
 #[derive(Debug,Serialize)]
@@ -72,7 +72,7 @@ impl Block for GeometryBlock {
             + 20 * self.complicated_polygons.len()
     }
     
-    fn add_object(&mut self, p: Self::Element) -> Result<()> {
+    fn add_object(&mut self, p: Self::Element) -> osmquadtree::Result<()> {
         match p {
             GeometryElement::Point(p) => {
                 self.points.push(p);

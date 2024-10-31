@@ -1,16 +1,16 @@
-use channelled_callbacks::CallFinish;
+use channelled_callbacks::{CallFinish, Result as ccResult};
 use osmquadtree::elements::{Element, ElementType, Quadtree, Relation};
 use crate::elements::collect_rings;
 use crate::position::point_in_poly_iter;
 use crate::{
     ComplicatedPolygonGeometry, GeometryStyle, OtherData, PolygonPart, Ring, RingPart, Timings,
-    WorkingBlock,
+    WorkingBlock, Result, Error
 };
 use osmquadtree::message;
 use osmquadtree::utils::ThreadTimer;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::{Error, ErrorKind, Result};
+
 use std::sync::Arc;
 
 type PendingWays = BTreeMap<i64, (BTreeSet<i64>, Option<RingPart>)>;
@@ -169,7 +169,7 @@ impl MultiPolygons {
         rel: &Relation,
     ) -> Result<Option<ComplicatedPolygonGeometry>> {
         if outer_ringparts.is_empty() {
-            return Err(Error::new(ErrorKind::Other, "no ring parts"));
+            return Err(Error::InvalidDataError(format!("no ring parts")));
         }
 
         let mut tm = ThreadTimer::new();
@@ -182,7 +182,7 @@ impl MultiPolygons {
         tm = ThreadTimer::new();
 
         if rings.is_empty() {
-            return Err(Error::new(ErrorKind::Other, "no rings"));
+            return Err(Error::InvalidDataError(format!("no rings")));
         }
 
         /*if rings.len()+rings2.len()>200 {
@@ -192,7 +192,7 @@ impl MultiPolygons {
 
         let (polys, _left3) = order_rings(rings, rings2);
         if polys.is_empty() {
-            return Err(Error::new(ErrorKind::Other, "no polys"));
+            return Err(Error::InvalidDataError(format!("no polys")));
         }
 
         self.tmcb += tm.since();
@@ -452,10 +452,11 @@ where
 
 impl<T> CallFinish for ProcessMultiPolygons<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType=Error> + ?Sized,
 {
     type CallType = WorkingBlock;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, wb: WorkingBlock) {
         let tx = ThreadTimer::new();
@@ -470,7 +471,7 @@ where
         self.counts.3 += c.3;
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let tx = ThreadTimer::new();
 
         let (ans, errs, mut msgs) = {

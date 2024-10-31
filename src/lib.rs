@@ -15,6 +15,8 @@ mod waywithnodes;
 mod wkb;
 mod tempfile;
 
+
+
 use osmquadtree::elements::{Element, Node, Quadtree, Relation, Way};
 use osmquadtree::sortblocks::TempData;
 pub use crate::position::{get_srid, LonLat, XY,calc_line_length};
@@ -32,6 +34,9 @@ pub use crate::minzoom::{FindMinZoom, MinZoomSpec};
 pub use crate::default_minzoom_values::DEFAULT_MINZOOM_VALUES;
 
 pub use pack_geometry::read_geometry_blocks;
+
+
+pub use osmquadtree::{Error,Result};
 
 use std::collections::BTreeMap;
 
@@ -63,4 +68,4 @@ pub enum OtherData {
 pub type Timings = channelled_callbacks::Timings<OtherData>;
 
 pub type CallFinishGeometryBlock =
-    Box<dyn channelled_callbacks::CallFinish<CallType = GeometryBlock, ReturnType = Timings>>;
+    Box<dyn channelled_callbacks::CallFinish<CallType = GeometryBlock, ReturnType = Timings, ErrorType=Error>>;

@@ -1,12 +1,12 @@
 use osmquadtree::sortblocks::{QuadtreeTree, WriteTempData, WriteTempFile, WriteTempFileSplit, TempData,SortBlocks,CollectTemp,read_temp_data};
-use channelled_callbacks::{CallFinish, Callback, CallbackMerge, CallbackSync, CallAll, MergeTimings, ReplaceNoneWithTimings};
+use channelled_callbacks::{CallFinish, Callback, CallbackMerge, CallbackSync, CallAll, MergeTimings, ReplaceNoneWithTimings, Result as ccResult};
 use osmquadtree::utils::ThreadTimer;
 use osmquadtree::pbfformat::{HeaderType, FileBlock, WriteFile, pack_file_block,ParallelFileLocs,CompressionType};
 
-use crate::{GeometryBlock,CallFinishGeometryBlock,Timings,OtherData};
+use crate::{GeometryBlock,CallFinishGeometryBlock,Timings,OtherData, Error, Result};
 use osmquadtree::elements::{Bbox,};
 use osmquadtree::message;
-use std::io::Result;
+
 use std::sync::Arc;
 
 
@@ -23,13 +23,16 @@ struct WrapWriteFile(WriteFile);
 impl CallFinish for WrapWriteFile {
     type CallType = Vec<(i64, Vec<u8>)>;
     type ReturnType = Timings;
+    type ErrorType=Error;
 
     fn call(&mut self, p: Self::CallType) {
         self.0.call(p);
     }
 
-    fn finish(&mut self) -> Result<Timings> {
-        let (t, _) = self.0.finish()?;
+    fn finish(&mut self) -> ccResult<Timings, Error> {
+        //let (t, _) = self.0.finish().map_err(|e| Error::Osmquadtree(e))?;
+        let (t, _) = self.0.finish().map_err(|e| Error::InvalidDataError(format!("!! {}", e)))?;
+        
         let mut tms = Timings::new();
         tms.add("WriteFile", t);
         Ok(tms)
@@ -50,7 +53,7 @@ pub fn prep_write_geometry_pbffile(ofn: &str, bbox: &Bbox, numchan: usize) -> Re
     } else {
         let wts = CallbackSync::new(wf,numchan);
         let mut pps: Vec<
-            Box<dyn CallFinish<CallType = GeometryBlock, ReturnType = Timings>>,
+            Box<dyn CallFinish<CallType = GeometryBlock, ReturnType = Timings, ErrorType=Error>>,
         > = Vec::new();
         for wt in wts {
             let wt2 = Box::new(ReplaceNoneWithTimings::new(wt));
@@ -93,7 +96,7 @@ struct WrapWriteTemp<T> {
 }
 
 impl<T> WrapWriteTemp<T>
-    where T: CallFinish<CallType=Vec<(i64,Vec<u8>)>, ReturnType=osmquadtree::sortblocks::Timings>
+    where T: CallFinish<CallType=Vec<(i64,Vec<u8>)>, ReturnType=osmquadtree::sortblocks::Timings, ErrorType=osmquadtree::Error>
 {
     pub fn new(out: Box<T>) -> WrapWriteTemp<T> {
         WrapWriteTemp{out: out}
@@ -101,17 +104,21 @@ impl<T> WrapWriteTemp<T>
 }
 
 impl<T> CallFinish for WrapWriteTemp<T>
-    where T: CallFinish<CallType=Vec<(i64,Vec<u8>)>, ReturnType=osmquadtree::sortblocks::Timings>
+    where T: CallFinish<CallType=Vec<(i64,Vec<u8>)>, ReturnType=osmquadtree::sortblocks::Timings, ErrorType=osmquadtree::Error>
 {
     type CallType=Vec<(i64,Vec<u8>)>;
     type ReturnType = Timings;
+    type ErrorType = Error;
     
     fn call(&mut self, t: Vec<(i64,Vec<u8>)>) {
         self.out.call(t);
     }
     
-    fn finish(&mut self) -> Result<Timings> {
-        let mut orig = self.out.finish()?;
+    fn finish(&mut self) -> ccResult<Timings, Error> {
+        //let mut orig = self.out.finish().map_err(|e| Error::Osmquadtree(e))?;
+        let mut orig = self.out.finish().map_err(|e| Error::InvalidDataError(format!("{}",e)))?;
+        
+        
         let mut res = Timings::new();
         
         res.timings.extend(std::mem::take(&mut orig.timings));
@@ -145,10 +152,11 @@ impl<T> CollectTempGeometry<T>
 
 impl<T> CallFinish for CollectTempGeometry<T>
 where
-    T: CallFinish<CallType = Vec<(i64, Vec<u8>)>, ReturnType = Timings> + ?Sized
+    T: CallFinish<CallType = Vec<(i64, Vec<u8>)>, ReturnType = Timings, ErrorType=Error> + ?Sized
 {
     type CallType = GeometryBlock;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, bl: GeometryBlock) {
         let tx = ThreadTimer::new();
@@ -164,7 +172,7 @@ where
         self.out.call(xx);
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         
         let tx=ThreadTimer::new();
         let mm = self.collect.finish();
@@ -192,7 +200,7 @@ pub fn make_write_temp_geometry(outfn: &str, filelocs: &ParallelFileLocs, max_mi
                 
     let limit = 10000;
     let splitat = 32;
-    let wt: Box<dyn CallFinish< CallType = Vec<(i64, Vec<u8>)>, ReturnType = Timings>> =
+    let wt: Box<dyn CallFinish< CallType = Vec<(i64, Vec<u8>)>, ReturnType = Timings, ErrorType = Error>> =
         if filelocs.2 < 100*1024*1024 {
             Box::new(WrapWriteTemp::new(Box::new(WriteTempData::new())))
         } else {
@@ -268,10 +276,11 @@ impl<T> SortBlocksTempGeometry<T>
 }
 
 impl<T> CallFinish for SortBlocksTempGeometry<T>
-    where T: CallFinish<CallType=Vec<(i64, Vec<u8>)>, ReturnType=Timings>
+    where T: CallFinish<CallType=Vec<(i64, Vec<u8>)>, ReturnType=Timings, ErrorType=Error>
 {
     type CallType = (i64,Vec<FileBlock>);
     type ReturnType = Timings;
+    type ErrorType = Error;
     
     fn call(&mut self, d: (i64,Vec<FileBlock>)) {
         let tx=ThreadTimer::new();
@@ -280,7 +289,7 @@ impl<T> CallFinish for SortBlocksTempGeometry<T>
         self.out.call(res);
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         
         let mut tt = self.out.finish()?;
         tt.add("CollectBlocksTempGeometry", self.tm);
@@ -297,12 +306,12 @@ pub fn write_temp_geometry(outfn: &str, bbox: &Bbox, tempdata: TempData, groups:
             Some(&bbox),
         )));
 
-    let cq: Box<dyn CallFinish< CallType=(i64,Vec<FileBlock>), ReturnType=Timings>> = if numchan == 0 {
+    let cq: Box<dyn CallFinish< CallType=(i64,Vec<FileBlock>), ReturnType=Timings, ErrorType=Error>> = if numchan == 0 {
         Box::new(SortBlocksTempGeometry::new(wf, groups))
     } else {
         let wfs = CallbackSync::new(wf, numchan);
         let mut cqs: Vec<
-            Box<dyn CallFinish<CallType = (i64, Vec<FileBlock>), ReturnType = Timings>>,
+            Box<dyn CallFinish<CallType = (i64, Vec<FileBlock>), ReturnType = Timings, ErrorType=Error>>,
         > = Vec::new();
         for w in wfs {
             let w2 = Box::new(ReplaceNoneWithTimings::new(w));

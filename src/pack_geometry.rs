@@ -1,6 +1,7 @@
 use crate::{
     ComplicatedPolygonGeometry, GeometryBlock, LinestringGeometry, PointGeometry, PolygonPart,
-    Ring, RingPart, SimplePolygonGeometry, LonLat, WithBounds, CallFinishGeometryBlock, Timings
+    Ring, RingPart, SimplePolygonGeometry, LonLat, WithBounds, CallFinishGeometryBlock,
+    Timings, Error, Result
 };
 
 use osmquadtree::elements::{pack_head, PackStringTable, read_stringtable, read_common, Quadtree, Bbox};
@@ -9,7 +10,7 @@ use osmquadtree::mergechanges::{read_filter,Poly};
 use simple_protocolbuffers::{
     data_length, pack_data, pack_delta_int, pack_delta_int_ref, pack_value, zig_zag, un_zig_zag, PbfTag, IterTags, read_delta_packed_int
 };
-use std::io::{Error, ErrorKind, Result};
+
 
 fn pack_all(tag: u64, objs: Vec<Vec<u8>>) -> Vec<u8> {
     if objs.is_empty() {
@@ -132,7 +133,7 @@ fn unpack_linestring_geometry(strings: &Vec<String>, data: &[u8]) -> Result<Line
 } 
 fn set_lon_lats(lons: Vec<i64>, lats: Vec<i64>) -> Result<Vec<LonLat>> {
     if lons.len()!=lats.len() {
-        return Err(Error::new(ErrorKind::Other, "lons.len()!=lats.len()"));
+        return Err(Error::InvalidDataError(format!("lons.len()!=lats.len()")));
     }
     
     let mut res = Vec::with_capacity(lons.len());
@@ -380,7 +381,7 @@ fn unpack_complicated_polygon_geometry(strings: &Vec<String>, data: &[u8]) -> Re
             PbfTag::Data(25, d) => {
                 let (i,p) = unpack_polygon_part(&d)?;
                 if i != geom.parts.len() {
-                    return Err(Error::new(ErrorKind::Other, "parts order wrong?"));
+                    return Err(Error::InvalidDataError(format!("parts order wrong?")));
                 }
                 geom.parts.push(p);
             },
@@ -622,7 +623,7 @@ pub fn read_geometry_blocks(
         
         Ok(read_all_blocks_parallel_with_progbar(&mut files, &locs, cc, "read geometry blocks", total_len))
     } else {
-        Err(Error::new(ErrorKind::Other, "not impl"))
+        Err(Error::NotImplementedError)
     }?;
     
     message!("{}", r);

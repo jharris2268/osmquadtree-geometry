@@ -1,7 +1,7 @@
-use channelled_callbacks::CallFinish;
+use channelled_callbacks::{CallFinish, Result as ccResult};
 use osmquadtree::elements::{ElementType, Relation, Tag, Way};
 use crate::style::{OpType, RelationTagSpec};
-use crate::{GeometryStyle, OtherData, Timings, WorkingBlock};
+use crate::{GeometryStyle, OtherData, Timings, WorkingBlock, Error};
 use osmquadtree::utils::ThreadTimer;
 
 use std::collections::BTreeMap;
@@ -119,7 +119,7 @@ fn collect_vals(op_type: &OpType, i: usize, vals: &Vec<(usize, String)>) -> Opti
 
 impl<T> AddRelationTags<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType=Error> + ?Sized,
 {
     pub fn new(out: Box<T>, style: Arc<GeometryStyle>) -> AddRelationTags<T> {
         AddRelationTags {
@@ -188,10 +188,11 @@ where
 
 impl<T> CallFinish for AddRelationTags<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType=Error> + ?Sized,
 {
     type CallType = WorkingBlock;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, mut bl: WorkingBlock) {
         let tx = ThreadTimer::new();
@@ -207,7 +208,7 @@ where
         self.out.call(bl);
     }
 
-    fn finish(&mut self) -> std::io::Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let mut tms = self.out.finish()?;
 
         let m = format!(

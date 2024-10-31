@@ -13,9 +13,9 @@ use crate::{
     prep_write_geometry_pbffile, make_write_temp_geometry, write_temp_geometry
 };
 
+use crate::{Error, Result};
 
-
-use channelled_callbacks::{CallFinish, Callback, CallbackMerge, CallbackSync, MergeTimings, ReplaceNoneWithTimings};
+use channelled_callbacks::{CallFinish, Callback, CallbackMerge, CallbackSync, MergeTimings, ReplaceNoneWithTimings, Result as ccResult};
 use osmquadtree::utils::{
     parse_timestamp, LogTimes, ThreadTimer,
 };
@@ -25,6 +25,7 @@ use osmquadtree::mergechanges::read_filter;
 
 use osmquadtree::pbfformat::{
     make_read_primitive_blocks_combine_call_all,
+    //read_primitive_blocks_combine,
     read_all_blocks_parallel_with_progbar, FileBlock,
     ParallelFileLocs, get_file_locs
 };
@@ -34,7 +35,6 @@ use osmquadtree::sortblocks::{TempData,QuadtreeTree};
 
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
-use std::io::{Error,ErrorKind,Result};
 use std::sync::Arc;
 
 
@@ -102,7 +102,7 @@ impl StoreBlocks {
 impl CallFinish for StoreBlocks {
     type CallType = GeometryBlock;
     type ReturnType = Timings;
-
+    type ErrorType = Error;
     
             
 
@@ -127,7 +127,7 @@ impl CallFinish for StoreBlocks {
         }
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let mut tms = Timings::new();
         let rem = std::mem::take(&mut self.rem).unwrap();
         if rem.len()>0 {
@@ -179,10 +179,11 @@ where
 
 impl<T> CallFinish for CollectWorkingTiles<T>
 where
-    T: CallFinish<CallType = GeometryBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = GeometryBlock, ReturnType = Timings, ErrorType=Error> + ?Sized,
 {
     type CallType = WorkingBlock;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, wb: WorkingBlock) {
         self.npt += wb.geometry_block.points.len();
@@ -198,7 +199,7 @@ where
         }
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let mut tms = match self.out.as_mut() {
             None => Timings::new(),
             Some(out) => out.finish()?,
@@ -226,7 +227,7 @@ struct MakeGeometries<T: ?Sized> {
 
 impl<T> MakeGeometries<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType=Error> + ?Sized,
 {
     pub fn new(out: Box<T>, style: Arc<GeometryStyle>, recalcquadtree: bool) -> MakeGeometries<T> {
         MakeGeometries {
@@ -312,10 +313,11 @@ where
 
 impl<T> CallFinish for MakeGeometries<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType=Error> + ?Sized,
 {
     type CallType = WorkingBlock;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, mut bl: WorkingBlock) {
         let tx = ThreadTimer::new();
@@ -324,7 +326,7 @@ where
         self.out.call(bl);
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let mut tms = self.out.finish()?;
         tms.add("MakeGeometries", self.tm);
         tms.add_other(
@@ -396,6 +398,23 @@ pub enum OutputType {
 }
 
 
+/*
+fn wrap_read_primitive_blocks_combine(idx_blocks: (usize, Vec<FileBlock>)) -> PrimitiveBlock {
+    read_primitive_blocks_combine(idx_blocks.0 as i64, idx_blocks.1, None)
+        .expect("failed to read data")
+}
+
+fn make_read_primitive_blocks_combine_call_all(
+    out: Box<CallFinish<CallType = PrimitiveBlock, ReturnType = Timings, ErrorType=Error>>,
+) -> Box<impl CallFinish<CallType = (usize, Vec<FileBlock>), ReturnType = Timings, ErrorType=Error>> {
+    Box::new(CallAll::new(
+        out,
+        "read_primitive_blocks_combine",
+        Box::new(wrap_read_primitive_blocks_combine),
+    ))
+}
+*/
+
 pub fn process_geometry_call(
     pfilelocs: &mut ParallelFileLocs,
     out: Option<CallFinishGeometryBlock>,
@@ -410,9 +429,9 @@ pub fn process_geometry_call(
     let cf = Box::new(CollectWorkingTiles::new(out));
 
     type CallFinishWorkingBlock =
-        Box<dyn CallFinish<CallType = WorkingBlock, ReturnType = Timings>>;
+        Box<dyn CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType=Error>>;
 
-    let pp: Box<dyn CallFinish<CallType = (usize, Vec<FileBlock>), ReturnType = Timings>> =
+    let pp: Box<dyn CallFinish<CallType = (usize, Vec<FileBlock>), ReturnType = Timings, ErrorType=Error>> =
         if numchan == 0 {
             let fm: CallFinishWorkingBlock = if !minzoom.is_none() {
                 Box::new(FindMinZoom::new(cf, minzoom))
@@ -482,7 +501,7 @@ pub fn process_geometry_call(
             let ww = CallbackSync::new(Box::new(CollectWayNodes::new(ap, style.clone())), numchan);
 
             let mut pps: Vec<
-                Box<dyn CallFinish<CallType = (usize, Vec<FileBlock>), ReturnType = Timings>>,
+                Box<dyn CallFinish<CallType = (usize, Vec<FileBlock>), ReturnType = Timings, ErrorType=Error>>,
             > = Vec::new();
             for w in ww {
                 let w2 = Box::new(ReplaceNoneWithTimings::new(w));
@@ -536,7 +555,7 @@ pub fn process_geometry(
     tx.add("load_style");
 
     if !find_minzoom && !max_minzoom.is_none() {
-        return Err(Error::new(ErrorKind::Other, "must run with find_minzoom=true if specifing max_minzoom"));
+        return Err(Error::UserSelectionError(format!("must run with find_minzoom=true if specifing max_minzoom")));
     }
 
     let minzoom: Option<MinZoomSpec> = if find_minzoom {
@@ -552,7 +571,7 @@ pub fn process_geometry(
     let mut groups: Option<Arc<QuadtreeTree>> = None;
     
     
-    let out: Option<Box<dyn CallFinish<CallType = GeometryBlock, ReturnType = Timings>>> =
+    let out: Option<Box<dyn CallFinish<CallType = GeometryBlock, ReturnType = Timings, ErrorType=Error>>> =
         match &outfn {
             OutputType::None => None,
             OutputType::Collect | OutputType::Json(_) | OutputType::TiledJson(_) => {

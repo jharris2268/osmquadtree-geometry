@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-use channelled_callbacks::CallFinish;
+use channelled_callbacks::{CallFinish, Result as ccResult};
 use osmquadtree::elements::{Node, Quadtree, Tag, Way};
 use crate::style::ParentTagSpec;
-use crate::{GeometryStyle, OtherData, Timings, WorkingBlock};
+use crate::{GeometryStyle, OtherData, Timings, WorkingBlock, Error};
 use osmquadtree::utils::ThreadTimer;
 
 fn find_tag<'a>(tgs: &'a Vec<Tag>, k: &String) -> Option<&'a String> {
@@ -47,7 +47,7 @@ fn has_tag(tags: &Vec<Tag>, keys: &Vec<String>) -> bool {
 
 impl<T> AddParentTag<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType=Error> + ?Sized,
 {
     pub fn new(out: Box<T>, style: Arc<GeometryStyle>) -> AddParentTag<T> {
         let mut nk = BTreeSet::new();
@@ -202,10 +202,11 @@ where
 
 impl<T> CallFinish for AddParentTag<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType=Error> + ?Sized,
 {
     type CallType = WorkingBlock;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, mut bl: WorkingBlock) {
         let tx = ThreadTimer::new();
@@ -220,7 +221,7 @@ where
         }
     }
 
-    fn finish(&mut self) -> std::io::Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let tx = ThreadTimer::new();
         let ff = self.finish_all();
         let fx = tx.since();

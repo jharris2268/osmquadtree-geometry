@@ -1,10 +1,10 @@
-use channelled_callbacks::CallFinish;
+use channelled_callbacks::{CallFinish, Result as ccResult};
 use osmquadtree::elements::{Block, Element, Node, PrimitiveBlock, Quadtree};
-use crate::{GeometryStyle, LonLat, OtherData, Timings, WorkingBlock};
+use crate::{GeometryStyle, LonLat, OtherData, Timings, WorkingBlock, Error, Result};
 use osmquadtree::utils::ThreadTimer;
 
 use std::collections::BTreeMap;
-use std::io::{Error, ErrorKind, Result};
+
 use std::sync::Arc;
 
 type LocTile = BTreeMap<i64, LonLat>;
@@ -47,7 +47,7 @@ impl Locations {
             match self.get_loc(i) {
                 Some(l) => res.push(l),
                 None => {
-                    return Err(Error::new(ErrorKind::Other, format!("missing node {}", i)));
+                    return Err(Error::MissingDataError(format!("missing node {}", i)));
                 }
             }
         }
@@ -148,7 +148,7 @@ pub struct CollectWayNodes<T: ?Sized> {
 
 impl<T> CollectWayNodes<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType = Error> + ?Sized,
 {
     pub fn new(out: Box<T>, style: Arc<GeometryStyle>) -> CollectWayNodes<T> {
         CollectWayNodes {
@@ -164,10 +164,11 @@ where
 
 impl<T> CallFinish for CollectWayNodes<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType = Error> + ?Sized,
 {
     type CallType = PrimitiveBlock;
     type ReturnType = Timings;
+    type ErrorType=Error;
 
     fn call(&mut self, pb: PrimitiveBlock) {
         let tx = ThreadTimer::new();
@@ -177,7 +178,7 @@ where
         self.out.call(r);
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         self.locs.remove_all();
         let mut tms = self.out.finish()?;
         tms.add("CollectWayNodes", self.tm);

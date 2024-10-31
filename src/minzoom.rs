@@ -1,10 +1,10 @@
-use channelled_callbacks::CallFinish;
+use channelled_callbacks::{CallFinish, Result as ccResult};
 use osmquadtree::elements::{Tag, EARTH_WIDTH};
 use crate::default_minzoom_values::DEFAULT_MINZOOM_VALUES;
-use crate::{GeometryBlock, OtherData, Timings, WorkingBlock};
+use crate::{GeometryBlock, OtherData, Timings, WorkingBlock, Error, Result};
 use osmquadtree::utils::ThreadTimer;
 use std::collections::BTreeMap;
-use std::io::{Error, ErrorKind, Read, Result};
+use std::io::Read;
 use osmquadtree::message;
 
 fn get_type(t: &str, line: &usize) -> Result<usize> {
@@ -15,8 +15,7 @@ fn get_type(t: &str, line: &usize) -> Result<usize> {
     } else if t == "2" {
         Ok(2)
     } else {
-        Err(Error::new(
-            ErrorKind::Other,
+        Err(Error::UserSelectionError(
             format!("wrong type at line {}", line),
         ))
     }
@@ -96,8 +95,7 @@ impl MinZoomSpec {
             match row {
                 Ok(rec) => {
                     if rec.len() != 5 {
-                        return Err(Error::new(
-                            ErrorKind::Other,
+                        return Err(Error::UserSelectionError(
                             format!("minzoom at line {} wrong length", line),
                         ));
                     }
@@ -107,8 +105,7 @@ impl MinZoomSpec {
                     let zoom: i64 = match rec[3].parse() {
                         Ok(p) => p,
                         Err(_) => {
-                            return Err(Error::new(
-                                ErrorKind::Other,
+                            return Err(Error::UserSelectionError(
                                 format!("minzoom at line {} zoom not int", line),
                             ));
                         }
@@ -127,8 +124,7 @@ impl MinZoomSpec {
                     }
                 }
                 Err(e) => {
-                    return Err(Error::new(
-                        ErrorKind::Other,
+                    return Err(Error::UserSelectionError(
                         format!("{:?} at line {}", e, line),
                     ));
                 }
@@ -266,11 +262,12 @@ where
 
 impl<T> CallFinish for FindMinZoom<T>
 where
-    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings>,
+    T: CallFinish<CallType = WorkingBlock, ReturnType = Timings, ErrorType=Error>,
 {
     type CallType = WorkingBlock;
     type ReturnType = Timings;
-
+    type ErrorType = Error;
+    
     fn call(&mut self, mut bl: WorkingBlock) {
         match &self.spec {
             None => {}
@@ -283,7 +280,7 @@ where
         self.out.call(bl);
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let mut tms = self.out.finish()?;
         if !self.spec.is_none() {
             tms.add("FindMinZoom", self.tm);

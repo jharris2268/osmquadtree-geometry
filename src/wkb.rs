@@ -77,7 +77,7 @@ pub fn write_ring<W: Write, Iter: Iterator<Item = XY>>(
     }
     Ok(())
 }
-
+/*
 pub trait AsWkb {
     fn as_wkb(&self, srid: Option<u32>) -> Result<Vec<u8>>;
-}
+}*/

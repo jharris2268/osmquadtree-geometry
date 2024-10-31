@@ -10,7 +10,8 @@ use osmquadtree_geometry::{GeometryStyle, OutputType};
 use osmquadtree::message;
 use osmquadtree::defaultlogger::register_messenger_default;
 
-use std::io::{Error, ErrorKind, Result};
+use osmquadtree::{Result, Error};
+//use std::io::{Error, ErrorKind, Result};
 //use std::sync::Arc;
 
 fn process_geometry(
@@ -239,7 +240,7 @@ fn main() {
                 PostgresqlOptions::osm2pgsql(pc, &GeometryStyle::default())
             };
             if geom.is_present("EXTENDED") && !geom.is_present("FIND_MINZOOM") {
-                Err(Error::new(ErrorKind::Other, "find_minzoom must be called with extended table format!"))
+                Err(Error::UserSelectionError(format!("find_minzoom must be called with extended table format!")))
             } else {
                 
                 process_geometry(
@@ -263,7 +264,7 @@ fn main() {
                 PostgresqlOptions::osm2pgsql(pc, &GeometryStyle::default())
             };
             if geom.is_present("EXTENDED") && !geom.is_present("FIND_MINZOOM") {
-                Err(Error::new(ErrorKind::Other, "find_minzoom must be called with extended table format!"))
+                Err(Error::UserSelectionError(format!("find_minzoom must be called with extended table format!")))
             } else {
                 
                     process_geometry(
@@ -287,7 +288,7 @@ fn main() {
                 PostgresqlOptions::osm2pgsql(pc, &GeometryStyle::default())
             };
             if geom.is_present("EXTENDED") && !geom.is_present("FIND_MINZOOM") {
-                Err(Error::new(ErrorKind::Other, "find_minzoom must be called with extended table format!"))
+                Err(Error::UserSelectionError(format!("find_minzoom must be called with extended table format!")))
             } else {
                 
                 process_geometry(
@@ -318,7 +319,7 @@ fn main() {
                 po.lowzoom = Some(vec![("lz6_".to_string(), 6, true), ("lz9_".to_string(), 9, false), ("lz11_".to_string(), 11, false)]);
             }
             if geom.is_present("EXTENDED") && !geom.is_present("FIND_MINZOOM") {
-                Err(Error::new(ErrorKind::Other, "find_minzoom must be called with extended table format!"))
+                Err(Error::UserSelectionError(format!("find_minzoom must be called with extended table format!")))
             } else {
                 
                 
@@ -358,7 +359,8 @@ fn main() {
                     None => message!("{}", pt.2.join("\n")),
                     Some(f) => {
                         if f.ends_with(".json") {
-                            let s = serde_json::to_string_pretty(&pt.2).or_else(|e| Err(Error::new(ErrorKind::Other, format!("?? {}",e))))?+"\n";
+                            //let s = serde_json::to_string_pretty(&pt.2).or_else(|e| Err(Error::new(ErrorKind::Other, format!("?? {}",e))))?+"\n";
+                            let s = serde_json::to_string_pretty(&pt.2)? + "\n";
                             
                             std::fs::write(f, &s)?;
                         } else if f.ends_with(".sql") {
@@ -372,7 +374,7 @@ fn main() {
             })()
         },
         
-        _ => Err(Error::new(ErrorKind::Other, "??")),
+        _ => Err(Error::NotImplementedError),
         
     };
 

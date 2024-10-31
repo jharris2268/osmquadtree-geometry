@@ -1,10 +1,13 @@
-use channelled_callbacks::{CallFinish, Callback, CallbackMerge, CallbackSync, MergeTimings, CallAll, ReplaceNoneWithTimings};
+use channelled_callbacks::{
+        CallFinish, Callback, CallbackMerge, CallbackSync,
+        MergeTimings, CallAll, ReplaceNoneWithTimings, Result as ccResult
+};
 use crate::postgresql::Connection;
 use crate::postgresql::{
     pack_geometry_block, prepare_tables, AllocFunc, PostgresqlConnection, PostgresqlOptions,
     PrepTable, TableSpec,
 };
-use crate::{GeometryBlock, OtherData, Timings};
+use crate::{GeometryBlock, OtherData, Timings,Result,Error};
 use osmquadtree::pbfformat::{pack_file_block, HeaderType, WriteFile, CompressionType};
 use osmquadtree::utils::{ThreadTimer, Timer};
 use osmquadtree::message;
@@ -13,7 +16,7 @@ use simple_protocolbuffers::{pack_data, pack_value};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{Result, Write};
+use std::io::{Write};
 use std::sync::{Arc, Mutex};
 
 struct PackedBlob {
@@ -31,10 +34,10 @@ impl PackedBlob {
 }
 
 impl Write for PackedBlob {
-    fn write(&mut self, d: &[u8]) -> Result<usize> {
+    fn write(&mut self, d: &[u8]) -> std::io::Result<usize> {
         self.data.write(d)
     }
-    fn flush(&mut self) -> Result<()> {
+    fn flush(&mut self) -> std::io::Result<()> {
         self.data.flush()
     }
 }
@@ -61,13 +64,14 @@ impl WriteGzipBlob {
 impl CallFinish for WriteGzipBlob {
     type CallType = Vec<u8>;
     type ReturnType = ();
+    type ErrorType = Error;
 
     fn call(&mut self, b: Vec<u8>) {
         self.output.write_all(&b).expect("!");
     }
-    fn finish(&mut self) -> Result<()> {
-        self.output.write_all(&PGCOPY_TAIL)?;
-        self.output.try_finish()?;
+    fn finish(&mut self) -> ccResult<(),Error> {
+        self.output.write_all(&PGCOPY_TAIL).map_err(|e| Error::Io(e))?;
+        self.output.try_finish().map_err(|e| Error::Io(e))?;
         Ok(())
     }
 }
@@ -97,7 +101,7 @@ struct WritePackedFiles {
         usize,
         (
             usize,
-            Option<Box<dyn CallFinish<CallType = Vec<u8>, ReturnType = ()>>>,
+            Option<Box<dyn CallFinish<CallType = Vec<u8>, ReturnType = (), ErrorType=Error>>>,
         ),
     >,
     tt: f64,
@@ -121,7 +125,7 @@ impl WritePackedFiles {
             match prfx {
                 Some(prfx) => {
                     let fname = format!("{}{}.copy.gz", prfx, t.name);
-                    let x: Box<dyn CallFinish<CallType = Vec<u8>, ReturnType = ()>> = if septhreads
+                    let x: Box<dyn CallFinish<CallType = Vec<u8>, ReturnType = (), ErrorType=Error>> = if septhreads
                     {
                         Box::new(Callback::new(Box::new(WriteGzipBlob::new(&fname))))
                     } else {
@@ -142,6 +146,7 @@ impl WritePackedFiles {
 impl CallFinish for WritePackedFiles {
     type CallType = Vec<PackedBlob>;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, pbbs: Vec<PackedBlob>) {
         let tx = ThreadTimer::new();
@@ -166,7 +171,7 @@ impl CallFinish for WritePackedFiles {
         self.tt += tx.since();
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let mut tm = Timings::new();
         tm.add("WritePackedFiles", self.tt);
 
@@ -198,12 +203,15 @@ impl WritePackedPbfFile {
 impl CallFinish for WritePackedPbfFile {
     type CallType = Vec<(i64, Vec<u8>)>;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, pbbs: Vec<(i64, Vec<u8>)>) {
         self.out.call(pbbs);
     }
-    fn finish(&mut self) -> Result<Timings> {
-        let (t, _) = self.out.finish()?;
+    fn finish(&mut self) -> ccResult<Timings,Error> {
+        let (t, _) = self.out.finish().map_err(|e| {
+            Error::InvalidDataError(format!("!! {}", e))
+        })?;
 
         let mut tm = Timings::new();
         tm.add("WritePackedPbfFile", t);
@@ -239,7 +247,7 @@ fn make_write_packed_pbffile(
     p: &str,
     tabs: &Vec<TableSpec>,
     numchan: usize,
-) -> Box<dyn CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings>> {
+) -> Box<dyn CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings, ErrorType = Error>> {
     let mut wf = Box::new(WritePackedPbfFile::new(&p));
     let header = serde_json::to_vec(&CopySpec::new(tabs, tabs.len() > 3)).expect("!");
     wf.call(vec![(
@@ -251,7 +259,7 @@ fn make_write_packed_pbffile(
         Box::new(CallAll::new(wf, "pack_pbf_blobs", Box::new(pack_pbf_blobs)))
     } else {
         let wfs = CallbackSync::new(wf, numchan);
-        let mut packs: Vec<Box<dyn CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings>>> =
+        let mut packs: Vec<Box<dyn CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings, ErrorType = Error>>> =
             Vec::new();
         for w in wfs {
             let w2 = Box::new(ReplaceNoneWithTimings::new(w));
@@ -272,7 +280,7 @@ fn prepare_writepostgresdata(
         opts: &PostgresqlOptions,
         newthread: bool,
         exec_after: bool,
-) -> Result<Box<dyn CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings>>> {
+) -> Result<Box<dyn CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings, ErrorType = Error>>> {
     let conn = Connection::connect(connstr)?;
 
     conn.execute("begin")?;
@@ -341,6 +349,7 @@ impl WritePostgresData {
 impl CallFinish for WritePostgresData {
     type CallType = Vec<PackedBlob>;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, pbs: Vec<PackedBlob>) {
         let tx = ThreadTimer::new();
@@ -353,7 +362,7 @@ impl CallFinish for WritePostgresData {
         self.tt += tx.since();
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let mut tm = Timings::new();
         tm.add("WritePostgresData::copy", self.tt);
 
@@ -401,7 +410,7 @@ impl CallFinish for WritePostgresData {
 fn prep_output(
     opts: &PostgresqlOptions,
     numchan: usize,
-) -> Result<Box<dyn CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings>>> {
+) -> Result<Box<dyn CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings, ErrorType = Error>>> {
     match &opts.connection {
         PostgresqlConnection::Connection((connstr, tableprfx, execindices)) => {
             prepare_writepostgresdata(connstr, tableprfx, opts, numchan != 0, *execindices)
@@ -433,7 +442,7 @@ struct PackPostgresData<T: ?Sized> {
 
 impl<T> PackPostgresData<T>
 where
-    T: CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings, ErrorType = Error> + ?Sized,
 {
     pub fn new(
         out: Box<T>,
@@ -467,10 +476,11 @@ where
 
 impl<T> CallFinish for PackPostgresData<T>
 where
-    T: CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings> + ?Sized,
+    T: CallFinish<CallType = Vec<PackedBlob>, ReturnType = Timings, ErrorType = Error> + ?Sized,
 {
     type CallType = GeometryBlock;
     type ReturnType = Timings;
+    type ErrorType = Error;
 
     fn call(&mut self, geoms: GeometryBlock) {
         let tx = ThreadTimer::new();
@@ -479,7 +489,7 @@ where
         self.tt += tx.since();
     }
 
-    fn finish(&mut self) -> Result<Timings> {
+    fn finish(&mut self) -> ccResult<Timings, Error> {
         let mut tm = self.out.finish()?;
         tm.add("PackPostgresData", self.tt);
         tm.add_other(
