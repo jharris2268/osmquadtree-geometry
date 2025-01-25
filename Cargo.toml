@@ -24,8 +24,8 @@ geos-sys = { version="2", features = ["v3_6_0"]}
 
 simple-protocolbuffers = { git = "https://github.com/jharris2268/simple-protocolbuffers.git", branch = "main" }
 channelled-callbacks = { git = "https://github.com/jharris2268/channelled-callbacks.git", branch = "main" }
-osmquadtree = { git = "https://github.com/jharris2268/osmquadtree-rust.git", branch = "main" }
-#osmquadtree = { path = "../osmquadtree/" }
+#osmquadtree = { git = "https://github.com/jharris2268/osmquadtree-rust.git", branch = "main" }
+osmquadtree = { path = "../osmquadtree/" }
 
 num_cpus = "*"
 
